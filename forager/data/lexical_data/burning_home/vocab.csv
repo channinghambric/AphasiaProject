@@ -1,0 +1,456 @@
+word,In.
+animal,CASTRO
+artifacts,GPT
+artwork,GPT
+baby,VO
+backup data,GPT
+backup storage device,GPT
+bank records,G
+bible,CASTRO
+birth certificate,G
+books,GPT
+business documents,GPT
+camera,GPT
+cash,GPT
+cat,VO
+checkbook,G
+child,VO
+children,VO
+clothes,VO
+clothing,VO
+collectibles,GPT
+comfort items,GPT
+computer,GPT
+credit cards,G
+diary,GPT
+documents,VO
+dog,VO
+electronics,GPT
+emergency contacts,GPT
+emergency kit,GPT
+family,VO
+family heirlooms,GPT
+family member,CASTRO
+financial records,GPT
+fire extinguisher,GPT
+first aid kit,GPT
+food,GPT
+furniture,VO
+gems,GPT
+gifts,GPT
+heirlooms,CASTRO
+identification,GPT
+id,Pilot
+important items,VO
+important papers,VO
+insurance,CASTRO
+insurance information,GPT
+jewelry,VO
+journal,GPT
+keepsakes,GPT
+keys,GPT
+kids,VO
+laptop,Pilot
+legal documents,GPT
+letters,GPT
+licenses,G
+manuscripts,GPT
+marriage records,G
+medical records,G
+medication,GPT
+mementos,CASTRO
+memorabilia,GPT
+money,VO
+music,GPT
+old people,Pilot
+paintings,GPT
+papers,VO
+paperwork,Pilot
+parents,Pilot
+passport,G
+people,VO
+person,VO
+personal care items,GPT
+pet,G
+pet supplies,GPT
+pets,VO
+phone,GPT
+photo album,VO
+photographs,VO
+photos,VO
+picture album,VO
+pictures,VO
+playstation,Pilot
+projects,GPT
+purse,VO
+recipes,GPT
+records,GPT
+religious items,GPT
+religious texts,GPT
+research,GPT
+safe,GPT
+schoolwork,Pilot
+scrapbook,GPT
+self,CASTRO
+sentimental items,GPT
+shoes,CASTRO
+siblings,Pilot
+social security card,G
+sports equipment,GPT
+stuffed animals,Pilot
+suitcase,GPT
+tax returns,Pilot
+television,CASTRO
+toiletries,G
+tools,GPT
+toys,GPT
+tv,VO
+valuables,VO
+vintage items,GPT
+wallet,VO
+wallet purse,VO
+water,G
+work,S
+adoption records,S
+bank card,S
+birth records,S
+bicycle,S
+stock certificates,S
+marriage certificate,S
+yearbook,S
+macbook,S
+car,S
+trash,S
+coat,S
+checks,S
+cookbook,S
+others,S
+nothing,S
+dirt,S
+court documents,S
+emergency bag,S
+family album,S
+family photos,S
+family videos,S
+home videos,S
+family items,S
+insurance records,S
+games,S
+infants,S
+bird,S
+ipad,S
+important documents,S
+insurance policy,S
+charging cords,S
+fish,S
+women,S
+men,S
+personal things,S
+medical equipment,S
+urn,S
+wife,S
+girlfriend,S
+husband,S
+boyfriend,S
+cherished belongings,S
+vehicle,S
+teddy bear,S
+doll,S
+relatives,S
+humans,S
+friends,S
+vinyl albums,S
+weed,S
+grandma,S
+grandpa,S
+babies,S
+senior citizen,S
+kitten,S
+bug out bag,S
+mom,S
+dad,S
+utensils,S
+rabbit,S
+sister,S
+brother,S
+yourself,S
+gold,S
+bedding,S
+meaningful items,S
+safety deposit box,S
+war medals,S
+live ammunition,S
+drivers license,S
+treasured possessions,S
+wedding ring,S
+docs,S
+clock,S
+antiques,S
+pocketbook,S
+adult,S
+rodent,S
+bonds,S
+deed,S
+firearm,S
+irreplaceable items,S
+irreplaceable jewelry,S
+victims,S
+property,S
+fireman,S
+old lady,S
+bunny,S
+gaming station,S
+art work,S
+kitchen goods,S
+diplomas,S
+expensive items,S
+specialized equipment,S
+weapons,S
+valuable jewelry,S
+chair,S
+bag,S
+vault,S
+appliances,S
+pc,S
+ps,S
+nintendo,S
+guitar,S
+memories,S
+will,S
+necklace,S
+movies,S
+daughter,S
+son,S
+blanket,S
+id card,S
+neighbors,S
+prized possessions,S
+people in the house,S
+mug,S
+water bottle,S
+insurance paperwork,S
+instruments,S
+hard drive,S
+files,S
+fire alarm,S
+sprinkler system,S
+fire and rescue,S
+ladder,S
+towel under door,S
+low crawl,S
+teenager,S
+mother,S
+china,S
+favorite clothes,S
+school reports,S
+dvds,S
+external hard drive,S
+lockbox,S
+boy,S
+girl,S
+guns,S
+cookware,S
+guinea pig,S
+baseball cards,S
+beer,S
+video game console,S
+toddler,S
+horse,S
+gin,S
+socks,S
+pillows,S
+game system,S
+souvenirs,S
+phone numbers,S
+technology,S
+partner,S
+pottery,S
+tablets,S
+items of personal value,S
+contacts,S
+glasses,S
+people living there,S
+ssn card,S
+loved ones,S
+anything alive,S
+oxygen,S
+mail,S
+wedding dress,S
+goldfish,S
+bank statement,S
+torah,S
+folder,S
+credentials,S
+lamp,S
+old stuff,S
+ice cream,S
+titles,S
+drinks,S
+mattress,S
+stuff,S
+makeup,S
+firefighters,S
+hydrant,S
+elderly,S
+condiments,S
+albums,S
+favorite toy,S
+rug,S
+handmade things,S
+earbuds,S
+kindle,S
+favorite photos,S
+memory books,S
+power tools,S
+cousin,S
+grandfather,S
+grandmother,S
+orphan,S
+injured,S
+rings,S
+baby book,S
+disabled person,S
+fridge,S
+microwave,S
+tv stand,S
+plate,S
+fork,S
+wardrobe,S
+wheelchair,S
+money stash,S
+treasure,S
+memory box,S
+novelties,S
+video games,S
+everything,S
+backpack,S
+lizard,S
+drawings,S
+memorable gifts,S
+devices,S
+home insurance papers,S
+jacket,S
+sock monkey,S
+box,S
+airpods,S
+essentials,S
+me,S
+consoles,S
+hair products,S
+cards,S
+dolls,S
+radio,S
+desktop,S
+memorable items,S
+trinkets,S
+ashes of deceased,S
+negatives,S
+sketchbooks,S
+studies,S
+each other,S
+bed,S
+expensive gadget,S
+to go bag,S
+exotic animals,S
+priceless keepsakes,S
+hairbrush,S
+table,S
+trophies,S
+bracelet,S
+violin,S
+trumpet,S
+legos,S
+silver,S
+will and testament,S
+degrees,S
+monitor,S
+notebook,S
+roommate,S
+living things,S
+human beings,S
+belongings,S
+fire blanket,S
+quilt,S
+fire truck,S
+fire hydrant,S
+mask,S
+smoke alarm,S
+typewriter,S
+historical relics,S
+watch,S
+firebox,S
+small safe,S
+lady,S
+expensive devices,S
+stamp collection,S
+backups,S
+wedding album,S
+personal belongings,S
+toilet paper,S
+ferret,S
+handicapped family,S
+sleeping family,S
+childhood items,S
+reptile,S
+expensive belongings,S
+car keys,S
+vase,S
+work bag,S
+kids blankie,S
+pregnant women,S
+unconscious people,S
+lives,S
+secrets,S
+cds,S
+significant other,S
+niece,S
+nephew,S
+parrot,S
+favorite things,S
+explosive items,S
+tunes,S
+cell,S
+other people,S
+mortgage paperwork,S
+plants,S
+grandparents,S
+old photos,S
+spoons,S
+scriptures,S
+craft projects,S
+spouse,S
+dcor,S
+snake,S
+homework,S
+dishes,S
+ashes,S
+hose,S
+music equipment,S
+essential work equipment,S
+father,S
+sweater,S
+hamster,S
+ashes of loved one,S
+debit,S
+the cat,S
+the dog,S
+anything you can grab,S
+deed title,S
+older persons,S
+your kid,S
+cellphone,S
+everything and everyone,S
+house deed,S
+charger for phone,S
+little brother,S
+little sister,S
+little sibling,S
+smoke detector,S
+gaming device,S
+your phone,S
+charger,S
+precious jewelry,S
+treasured jewelry,S
+any person or animal inside,S
+key documents,S
+people who work in building,S

@@ -1,0 +1,506 @@
+---
+title: "Aphasia  Project"
+author: "Channing Hambric"
+date: "2024-11-12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Libraries
+```{r cars}
+library(tidyverse)
+library(purrr)
+library(dplyr)
+library(ggplot2)
+library(ggthemes)
+library(tidyboot)
+library(paletteer)
+library(ggbeeswarm)
+library(lme4)
+library(emmeans)
+library(knitr)
+library(ggridges)
+library(patchwork)
+
+```
+
+#Import Data
+```{r}
+control_fluency<-read.csv("../excel_data/Controls_Fluency.csv")
+pwa_fluency<-read.csv("../excel_data/PWA_Fluency.csv")
+pwa_dx<-read.csv("../excel_data/3_PWA_BatteryData_NoID.csv")
+```
+
+
+#Data Cleaning
+```{r}
+#reformat data
+control_fluency <- control_fluency %>% select(-X1) %>%
+  pivot_longer(cols = starts_with("X"),  
+               names_to = "Word",           
+               values_to = "Entry") %>%select(-Word) %>%filter(Entry != "") %>% rename(ID=Fluency.Code)
+
+pwa_fluency <- pwa_fluency %>% select(-X1) %>%
+  pivot_longer(cols = starts_with("X"),  
+               names_to = "Word",           
+               values_to = "Entry") %>%select(-Word) %>%filter(Entry != "") 
+
+#Link dx
+dx<-pwa_dx %>%select(Fluency.ID,LangDx) %>% rename(ID=Fluency.ID) %>% mutate(ID = as.character(ID))%>%distinct(ID, .keep_all = TRUE)
+pwa_fluency<-pwa_fluency %>%
+  left_join(dx,by="ID") %>%
+  mutate(LangDx = str_to_lower(LangDx)) %>%mutate_all(~str_replace_all(., "\\s+", ""))
+
+#Counting fluency
+control_fluency<- control_fluency %>%group_by(ID) %>% mutate(fluency_score=n()) %>%
+  ungroup()
+
+pwa_fluency<-pwa_fluency %>%group_by(ID) %>% mutate(fluency_score=n()) %>%
+  ungroup()
+
+#How many pwa have > 10 entries?
+pwa_fluency_cutoff<- pwa_fluency %>% filter(fluency_score>=10)
+
+#List of ids to be dropped
+pwa_fluency_dropped_ids <- pwa_fluency %>%
+  filter(fluency_score < 10)
+
+cutoff_id_count <- pwa_fluency_cutoff %>%
+  summarize(Unique_IDs = n_distinct(ID)) %>%
+  print()
+
+
+#dx distribution of retained ids
+pwa_fluency_dist<- pwa_fluency_cutoff %>% group_by(LangDx) %>%
+  summarize(Unique_Participants = n_distinct(ID))
+pwa_fluency_dist
+
+#Writing cutoff file to csv
+#write.csv(pwa_fluency_cutoff,"pwa_fluency_cleaned.csv")
+#write.csv(control_fluency,"control_fluency_cleaned.csv")
+```
+
+#Basic Fluency
+```{r}
+comb_fluency<- rbind(pwa_fluency_cutoff %>% select(ID,Entry,fluency_score) %>%mutate(Group="PWA"),control_fluency %>%select(ID,Entry,fluency_score) %>%mutate(Group="Control"))
+
+#Does fluency score sig differ by group
+fluency_comp<-comb_fluency %>% select(ID,Group,fluency_score) %>%unique()
+fluency<- lm(data=fluency_comp,fluency_score~Group)
+summary(fluency)
+
+#Plots
+#Basic Fluency Comparison
+comb_fluency %>% select(ID,Group,fluency_score) %>%unique()%>%
+  ggplot(aes(x = Group, y = fluency_score, fill = Group)) +
+    geom_boxplot(color = "black") +
+    labs(y = 'number of items produced', x = "") +
+    theme_few() + theme(legend.position = "none")+
+    scale_fill_paletteer_d("lisa::SandroBotticelli")
+
+#Eyeballing Distribution of Fluency Performance
+comb_fluency %>%
+  select(ID, Group, fluency_score) %>%
+  unique() %>%
+  ggplot(aes(x = fluency_score, fill = Group)) +
+  geom_density(alpha = 0.6, position = 'identity') + 
+  labs(y = 'density', x = "fluency score") +
+  theme_few() + 
+  scale_fill_paletteer_d("lisa::SandroBotticelli")
+```
+#Importing Forager Output
+
+```{r}
+#Lexical data
+control_lex_results <- read_csv(unz("../forager/output/control/animals_forager_results.zip","lexical_results.csv")) %>% mutate(Group = "Control")
+pwa_lex_results=read_csv(unz("../forager/output/pwa/animals_forager_results.zip","lexical_results.csv")) %>% mutate(Group = "PWA")
+
+all_lexical = rbind(control_lex_results,pwa_lex_results)
+
+
+#Fluency x clustering data
+control_indv_results <- read_csv(unz("../forager/output/control/animals_forager_results.zip","individual_descriptive_stats.csv")) %>% mutate(Group = "Control")
+pwa_indv_results=read_csv(unz("../forager/output/pwa/animals_forager_results.zip","individual_descriptive_stats.csv")) %>% mutate(Group = "PWA")
+
+all_indv = rbind(control_indv_results,pwa_indv_results) %>% rename("Numb_of_Items"="#_of_Items")
+
+#Models
+control_model_results <- read_csv(unz("../forager/output/control/animals_forager_results.zip","model_results.csv")) %>% mutate(Group = "Control")
+pwa_model_results=read_csv(unz("../forager/output/pwa/animals_forager_results.zip","model_results.csv")) %>% mutate(Group = "PWA")
+
+all_models = rbind(control_model_results,pwa_model_results)
+
+```
+
+
+#Lexical Analyses
+
+```{r}
+#Does avg semantic similarity differ by domain/type
+sem_sim_comparison = all_lexical %>% group_by(Group, Subject) %>%
+  summarise(avg_sem_sim = mean(Semantic_Similarity),
+            items = n()) 
+
+sem_sim_lm = lm(data = all_indv, Semantic_Similarity_mean ~ Group*Numb_of_Items)
+summary(sem_sim_lm)
+car::Anova(sem_sim_lm)
+
+
+#Does avg phonological similarity differ by domain/type
+phon_sim_comparison = all_lexical %>% group_by(Group,Subject) %>%
+  summarise(avg_phon_sim = mean(Phonological_Similarity),
+            items = n()) 
+
+phon_sim_lm = lm(data = all_indv, Phonological_Similarity_mean ~ Group*Numb_of_Items)
+summary(phon_sim_lm)
+car::Anova(phon_sim_lm)
+
+
+#Does avg frequency differ by domain/type
+freq_comparison = all_lexical %>% group_by(Group,Subject) %>%
+  summarise(avg_freq = mean(Frequency_Value),
+            items = n()) 
+
+freq_lm = lm(data = all_indv, Frequency_Value_mean ~ Group*Numb_of_Items)
+summary(freq_lm)
+car::Anova(freq_lm)
+
+
+
+#Plots
+
+#semantic
+sem <- sem_sim_comparison %>%
+  ggplot(aes(x = Group, y = avg_sem_sim, color = Group, fill = Group)) +
+    geom_violin(trim = TRUE, alpha = 0.6,color="black") +  
+    labs(y = 'semantic similarity', x = '') +
+    theme_few()  + theme(legend.position = "none")+
+    scale_fill_paletteer_d("lisa::SandroBotticelli") 
+sem
+
+#Phonological
+phon <- phon_sim_comparison %>%
+  ggplot(aes(x = Group, y = avg_phon_sim, color = Group, fill = Group))+
+    geom_violin(trim = TRUE, alpha = 0.6,color="black") +  # Use violin plot with slightly transparent fill
+    labs(y = 'phonological similarity', x = '') +
+    theme_few() +theme(legend.position = "none")+
+    scale_fill_paletteer_d("lisa::SandroBotticelli") 
+phon
+
+#frequency
+freq <- freq_comparison %>%
+  ggplot(aes(x = Group, y = avg_freq, color = Group, fill = Group))+
+    geom_violin(trim = TRUE, alpha = 0.6,color="black") +  # Use violin plot with slightly transparent fill
+    labs(y = 'word frequency', x = '') +
+    theme_few() +theme(legend.position = "none")+
+    scale_fill_paletteer_d("lisa::SandroBotticelli") 
+freq
+```
+
+#Lexical x Fluency
+```{r}
+#Numb items produced x lexical data
+numb_sem <- all_indv %>%
+  ggplot(aes(y = Semantic_Similarity_mean, x = Numb_of_Items, group = Group, color = Group)) +
+  labs(x = "Number of Items", y = "mean semantic similarity") +
+  theme_few() +  
+  geom_smooth(method = "lm", se = TRUE,size=3)  +
+  scale_color_paletteer_d("lisa::SandroBotticelli")
+numb_sem
+
+numb_phon <- all_indv %>%
+  ggplot(aes(y= Phonological_Similarity_mean, x = Numb_of_Items, group = Group, color = Group )) +
+  labs(x = "number of items", y = "mean phonological similarity") +
+    theme_few() +  geom_smooth(method = "lm", se = TRUE,size=3) +scale_color_paletteer_d("lisa::SandroBotticelli")
+numb_phon
+
+numb_freq<- all_indv %>%
+  ggplot(aes(y= Frequency_Value_mean, x = Numb_of_Items, group = Group, color = Group)) +
+  labs(x = "number of items", y = "mean word frequency") +
+    theme_few() +  geom_smooth(method = "lm", se = TRUE,size=3)  +scale_color_paletteer_d("lisa::SandroBotticelli")
+numb_freq
+
+
+#Does mean semantic similarity x Group predict numb items produced
+semsim_model = lm(data = all_indv, 
+                Numb_of_Items ~ Semantic_Similarity_mean*Group)
+summary(semsim_model)
+car::Anova(semsim_model)
+
+#Does mean phon similarity x Group predict numb items produced
+phonsim_model = lm(data = all_indv, 
+                Numb_of_Items ~ Phonological_Similarity_mean*Group)
+summary(phonsim_model)
+car::Anova(phonsim_model)
+
+
+#Does mean phonological similarity x Group predict numb items produced
+freq_model = lm(data = all_indv, 
+                Numb_of_Items ~ Frequency_Value_mean*Group)
+summary(freq_model)
+car::Anova(freq_model)
+#Sig GroupxFreq intx
+
+#Reverse it
+
+#Does fluency x Group predict mean semantic similarity
+semsim_model = lm(data = all_indv, 
+                Semantic_Similarity_mean ~ Numb_of_Items*Group)
+summary(semsim_model)
+car::Anova(semsim_model)
+
+#Does fluency x Group predict mean phon similarity 
+phonsim_model = lm(data = all_indv, 
+                Phonological_Similarity_mean ~ Numb_of_Items*Group)
+summary(phonsim_model)
+car::Anova(phonsim_model)
+#Sig Group x Phon sim intx
+
+
+#Does fluency x Group predict mean phonological similarity
+freq_model = lm(data = all_indv, 
+                Frequency_Value_mean ~ Numb_of_Items*Group)
+summary(freq_model)
+car::Anova(freq_model)
+
+
+```
+
+#Clustering Analyses
+```{r}
+all_indv<- all_indv %>% separate(Switch_Method, into = c("method", "param1", "param2", "param3"), sep = "_", fill = "right") 
+#Across Switch Methods
+#Avg cluster size and num switches by domain/type
+clusters = all_indv %>%
+  group_by(Group) %>%
+  summarise(
+    cluster_mean = mean(Cluster_Size_mean),
+    cluster_sd = sd(Cluster_Size_std),
+    num_switches = mean(Number_of_Switches),
+    sd_switches = sd(Number_of_Switches))
+kable(clusters)
+
+
+#Across methods, does cluster size differ by  Group
+#Number of items generated as a covariate
+cluster_size_lm = lm(data = all_indv, Cluster_Size_mean ~ Group * Numb_of_Items)
+summary(cluster_size_lm)
+car::Anova(cluster_size_lm)
+
+
+#Does number of switches differ by Group
+switch_lm = lm(data = all_indv, Number_of_Switches ~ Group * Numb_of_Items)
+summary(switch_lm)
+car::Anova(switch_lm)
+
+
+all_clusters = all_indv %>%
+  group_by(Group,method) %>%
+  summarise(
+    cluster_mean = mean(Cluster_Size_mean),
+    cluster_sd = sd(Cluster_Size_std),
+    num_switches = mean(Number_of_Switches),
+    sd_switches = sd(Number_of_Switches))
+
+
+all_clusters %>%
+  ggplot(aes(x = Group, y = cluster_mean, fill = method)) +  
+  geom_col(position = position_dodge(width = 0.8), width = 0.7)  +  
+  scale_fill_paletteer_d("lisa::SandroBotticelli") +  
+  labs(x = "", fill = "method", y = "avg cluster size") +theme_few()
+  
+
+all_clusters %>%
+  ggplot(aes(x = Group, y = num_switches, fill = method)) + 
+   geom_col(position = position_dodge(width = 0.8), width = 0.7) + 
+  scale_fill_paletteer_d("lisa::SandroBotticelli") +theme_few()
+```
+
+#Model Analyses
+```{r}
+all_models = all_models %>% 
+  separate(Model, 
+           into = c("forage", "foraging_type", "method", "param1", "param2", "param3"), sep = "_")
+
+agg_model_sum_nLL = all_models %>%group_by(Group,foraging_type,method,param1,param2,param3) %>%
+  summarise(sum_nLL = sum(Negative_Log_Likelihood_Optimized)) %>%
+  arrange(sum_nLL)
+
+
+group_best_model <- agg_model_sum_nLL %>% group_by(Group) %>%
+  arrange(sum_nLL) %>%       
+  slice(1) %>%                
+  mutate(foraging_type = as.factor(foraging_type),  
+         model_type = fct_recode(foraging_type, 
+                                  `pstatic` = "phonologicalstatic", 
+                                  `plocal` = "phonologicaldynamiclocal",
+                                  `pglobal` = "phonologicaldynamicglobal",
+                                  `pswitch` = "phonologicaldynamicswitch",
+                                  `static` = "static", 
+                                  `dynamic` = "dynamic", 
+                                  `random` = "random")) %>%
+  mutate(full_method=paste(method,param1,param2,param3,sep="_"))%>%
+  mutate(full_model=paste(model_type,full_method,sep="_"))%>%
+  select(Group,full_model,model_type, full_method,sum_nLL)
+
+kable(group_best_model)
+
+#Best Clustering Method analyses
+control_best_method<- group_best_model$full_method[1]
+pwa_best_method<-group_best_model$full_method[2]
+
+
+all_indv<-all_indv %>% mutate(full_method=paste(method,param1,param2,param3,sep="_"))
+
+best_control_clusters = all_indv %>% filter(Group=="Control") %>% filter(full_method==control_best_method) %>%
+  summarise(
+    cluster_mean = mean(Cluster_Size_mean),
+    cluster_sd = sd(Cluster_Size_std),
+    num_switches = mean(Number_of_Switches),
+    sd_switches = sd(Number_of_Switches)) %>%
+    mutate(Group="Control")
+best_pwa_clusters = all_indv %>% filter(Group=="PWA") %>%filter(full_method==pwa_best_method) %>%
+  summarise(
+    cluster_mean = mean(Cluster_Size_mean),
+    cluster_sd = sd(Cluster_Size_std),
+    num_switches = mean(Number_of_Switches),
+    sd_switches = sd(Number_of_Switches)) %>%
+    mutate(Group="PWA")
+
+comb_best_clusters<-rbind(best_control_clusters,best_pwa_clusters)%>%select(Group,cluster_mean,cluster_sd,num_switches,sd_switches)
+kable(comb_best_clusters)
+
+#Full participant data
+full_control_clusters = all_indv %>% filter(Group=="Control")%>% filter(full_method==control_best_method)
+
+full_pwa_clusters = all_indv %>% filter(Group=="PWA")%>%filter(full_method==pwa_best_method)
+
+
+comb_part_clusters<-rbind(full_control_clusters,full_pwa_clusters) 
+
+num_items<- all_indv %>% select(Subject,Group,Numb_of_Items) %>%na.omit() %>%rename(num_items=Numb_of_Items)
+comb_part_clusters<-comb_part_clusters %>%
+  left_join(num_items, by = c("Subject" = "Subject", "Group" = "Group"))
+
+
+#When using the best method, does avg cluster mean differ by Group x domain
+diff_best_cluster_size_lm = lm(data = comb_part_clusters, Cluster_Size_mean ~ Group*num_items)
+summary(diff_best_cluster_size_lm)
+car::Anova(diff_best_cluster_size_lm)
+
+
+#When using the best method, does avg numb switches differ by Group x domain
+best_switch_numb_lm = lm(data = comb_part_clusters, Number_of_Switches ~ Group*num_items)
+summary(best_switch_numb_lm)
+car::Anova(best_switch_numb_lm)
+
+
+#These might need to be fixed to reflect accounting for number of items- output model estimates
+
+# Ridge plot for avg cluster size
+plot1 <- comb_part_clusters %>%
+  ggplot(aes(x = Cluster_Size_mean, y = Group, color = Group, fill = Group)) +
+  geom_density_ridges(alpha = 0.7) +
+  labs(y = 'Group', x = "avg cluster size") +
+  theme_few() + theme(legend.position = "none")+ 
+  scale_fill_paletteer_d("lisa::SandroBotticelli") +
+  scale_color_paletteer_d("lisa::SandroBotticelli") +
+  scale_x_continuous(limits = c(0, NA))
+
+# Ridge plot for avg number of switches with one ridge per Group
+plot2 <- comb_part_clusters %>%
+  ggplot(aes(x = Number_of_Switches, y = Group, color = Group, fill = Group)) +
+  geom_density_ridges(alpha = 0.7) +
+  labs(y = '', x = "avg number of switches") +
+  theme_few() + theme(legend.position = "none")+  scale_fill_paletteer_d("lisa::SandroBotticelli") +
+  scale_color_paletteer_d("lisa::SandroBotticelli") +
+  scale_x_continuous(limits = c(0, NA))
+
+plot1 + plot2
+```
+#Beta Analyses
+```{r}
+
+#Filtering to only include best model for each domain type
+all_models<-all_models %>%mutate(foraging_type = as.factor(foraging_type),  
+         model_type = fct_recode(foraging_type, 
+                                  `pstatic` = "phonologicalstatic", 
+                                  `plocal` = "phonologicaldynamiclocal",
+                                  `pglobal` = "phonologicaldynamicglobal",
+                                  `pswitch` = "phonologicaldynamicswitch",
+                                  `static` = "static", 
+                                  `dynamic` = "dynamic", 
+                                  `random` = "random")) %>% mutate(full_model=paste(model_type,method,param1,param2,param3,sep="_")) 
+
+best_model_control <- group_best_model$full_model[1]
+best_model_pwa <- group_best_model$full_model[2]
+
+
+control_best_model = all_models %>% filter(Group=="Control")%>%filter(full_model==best_model_control) 
+pwa_best_model = all_models %>% filter(Group=="PWA") %>%filter(full_model==best_model_pwa) 
+
+comb_beta_models<-rbind(control_best_model,pwa_best_model) 
+
+#By participant betas for best model for that domain 
+group_best_beta_values  = comb_beta_models  %>%
+  pivot_longer(names_to = "beta", cols = c(Beta_Frequency, Beta_Phonological, Beta_Semantic)) 
+
+#Best group model betas across participants
+group_best_beta_values %>%
+  group_by(Group, beta) %>%
+  tidyboot_mean(value, nboot = 1000, na.rm = TRUE) %>%
+  separate(beta, into = c("b", "beta")) %>%
+  mutate(beta = tolower(beta),
+         beta = fct_recode(beta, 
+                           `semantic\nsimilarity` = "semantic", 
+                           `phonological\nsimilarity` = "phonological",
+                           `word frequency` = "frequency")) %>%
+  mutate(beta = fct_relevel(beta, "semantic\nsimilarity", "word frequency", "phonological\nsimilarity")) %>%
+  ggplot(aes(x = beta, y = empirical_stat, group = Group, fill = Group)) +
+  geom_bar(stat = 'identity', position = "dodge",color="black") +
+  geom_errorbar(aes(ymin = ci_lower, ymax = ci_upper), width = 0, position =  position_dodge(0.9)) +
+  labs(y = bquote(beta ~ "(parameter salience)"), x = "") +
+  theme_few()+
+  scale_fill_paletteer_d("lisa::SandroBotticelli")
+
+#Beta testing - Best model for that group 
+#Does use of semantic similarity differ across Groups 
+diff_type_best_beta_semantic_model = lm(data =group_best_beta_values  %>% filter(beta == "Beta_Semantic"), value ~ Group)
+summary(diff_type_best_beta_semantic_model)
+car::Anova(diff_type_best_beta_semantic_model)
+
+
+#Does use of phon similarity differ 
+diff_type_best_beta_phon_model = lm(data =group_best_beta_values  %>% filter(beta == "Beta_Phonological"), value ~ Group)
+summary(diff_type_best_beta_phon_model)
+car::Anova(diff_type_best_beta_phon_model)
+
+#Does use of frequency differ across Groups 
+diff_type_best_beta_freq_model = lm(data = group_best_beta_values %>% filter(beta == "Beta_Frequency"), value ~ Group)
+summary(diff_type_best_beta_freq_model)
+car::Anova(diff_type_best_beta_freq_model)
+
+
+subject_best_models = all_models %>% 
+  group_by(Subject,Group) %>%
+  slice_min(Negative_Log_Likelihood_Optimized)
+  
+subject_best_models%>%
+    group_by(Group,model_type) %>%
+    count() %>%
+    ggplot(aes(x = Group, y = n, group = model_type, fill = model_type)) +
+    geom_col() +
+    labs(y = "number of participants", x = "", fill = "best model type") +  
+    theme_few() +
+    scale_fill_calc()+
+  scale_fill_paletteer_d("lisa::SandroBotticelli")
+
+```
+
+
+
+
+```{r}

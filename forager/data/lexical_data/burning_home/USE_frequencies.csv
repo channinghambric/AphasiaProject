@@ -1,0 +1,455 @@
+animal,4.81
+artifacts,3.72
+artwork,4.11
+baby,5.26
+backup data,4.18
+backup storage device,3.96
+bank records,4.71
+bible,4.54
+birth certificate,4.16
+books,5.15
+business documents,4.59
+camera,4.87
+cash,4.92
+cat,4.78
+checkbook,2.63
+child,5.3
+children,5.47
+clothes,4.72
+clothing,4.47
+collectibles,3.11
+comfort items,4.26
+computer,4.97
+credit cards,4.56
+diary,4.09
+documents,4.64
+dog,5.1
+electronics,4.19
+emergency contacts,4.04
+emergency kit,4.24
+family,5.66
+family heirlooms,2.59
+family member,5.06
+financial records,4.68
+fire extinguisher,2.92
+first aid kit,4.25
+food,5.4
+furniture,4.29
+gems,3.75
+gifts,4.38
+heirlooms,2.59
+identification,4.18
+id,4.61
+important items,4.69
+important papers,4.55
+insurance,4.94
+insurance information,4.82
+jewelry,4.12
+journal,4.77
+keepsakes,2.23
+keys,4.39
+kids,5.28
+laptop,4.23
+legal documents,4.51
+letters,4.66
+licenses,3.83
+manuscripts,3.65
+marriage records,4.6
+medical records,4.71
+medication,4.15
+mementos,2.6
+memorabilia,3.31
+money,5.64
+music,5.52
+old people,5.63
+paintings,4.2
+papers,4.61
+paperwork,3.84
+parents,5.21
+passport,4.05
+people,6.25
+person,5.55
+personal care items,4.59
+pet,4.45
+pet supplies,4.16
+pets,4.08
+phone,5.3
+photo album,4.69
+photographs,4.34
+photos,4.83
+picture album,4.77
+pictures,4.92
+playstation,3.94
+projects,4.81
+purse,3.95
+recipes,3.99
+records,4.9
+religious items,4.51
+religious texts,4.22
+research,5.39
+safe,5.07
+schoolwork,2.75
+scrapbook,2.93
+self,5.25
+sentimental items,3.51
+shoes,4.67
+siblings,4.05
+social security card,4.72
+sports equipment,4.61
+stuffed animals,3.91
+suitcase,3.55
+tax returns,4.49
+television,4.79
+toiletries,2.73
+tools,4.59
+toys,4.25
+tv,5.2
+valuables,3.1
+vintage items,4.08
+wallet,4.15
+wallet purse,3.74
+water,5.52
+work,5.96
+adoption records,4.1
+bank card,4.8
+birth records,4.53
+bicycle,3.98
+stock certificates,3.74
+marriage certificate,4.2
+yearbook,3.44
+macbook,3.41
+car,5.45
+trash,4.42
+coat,4.36
+checks,4.31
+cookbook,3.36
+others,5.42
+nothing,5.55
+dirt,4.24
+court documents,4.57
+emergency bag,4.45
+family album,4.93
+family photos,4.77
+family videos,4.73
+home videos,4.75
+family items,4.73
+insurance records,4.62
+games,5.44
+infants,3.76
+bird,4.63
+ipad,4.1
+important documents,4.58
+insurance policy,4.74
+charging cords,3.29
+fish,4.9
+women,5.57
+men,5.51
+personal things,5.09
+medical equipment,4.7
+urn,3.24
+wife,5.23
+girlfriend,4.68
+husband,5.0
+boyfriend,4.59
+cherished belongings,3.18
+vehicle,4.76
+teddy bear,3.82
+doll,4.06
+relatives,4.2
+humans,4.61
+friends,5.43
+vinyl albums,3.78
+weed,4.27
+grandma,4.11
+grandpa,3.8
+babies,4.45
+senior citizen,4.28
+kitten,3.64
+bug out bag,4.1
+mom,5.12
+dad,4.95
+utensils,3.2
+rabbit,4.05
+sister,4.95
+brother,5.11
+yourself,5.31
+gold,5.17
+bedding,3.4
+meaningful items,4.05
+safety deposit box,4.11
+war medals,3.97
+live ammunition,3.9
+drivers license,4.24
+treasured possessions,3.04
+wedding ring,4.52
+docs,3.5
+clock,4.43
+antiques,3.48
+pocketbook,2.66
+adult,4.8
+rodent,3.2
+bonds,4.27
+deed,3.75
+firearm,3.69
+irreplaceable items,3.0
+irreplaceable jewelry,2.98
+victims,4.56
+property,5.11
+fireman,3.2
+old lady,4.89
+bunny,3.88
+gaming station,4.27
+art work,5.21
+kitchen goods,4.32
+diplomas,3.01
+expensive items,4.43
+specialized equipment,4.01
+weapons,4.75
+valuable jewelry,3.97
+chair,4.69
+bag,4.79
+vault,3.9
+appliances,3.71
+pc,4.53
+ps,4.02
+nintendo,4.08
+guitar,4.48
+memories,4.5
+will,6.45
+necklace,3.85
+movies,4.79
+daughter,5.07
+son,5.28
+blanket,4.07
+id card,4.47
+neighbors,4.24
+prized possessions,3.21
+people in the house,5.59
+mug,3.71
+water bottle,4.52
+insurance paperwork,3.81
+instruments,4.32
+hard drive,4.98
+files,4.46
+fire alarm,4.24
+sprinkler system,3.05
+fire and rescue,4.42
+ladder,4.03
+towel under door,3.9
+low crawl,3.76
+teenager,4.09
+mother,5.24
+china,5.1
+favorite clothes,4.53
+school reports,4.84
+dvds,3.46
+external hard drive,4.39
+lockbox,2.19
+boy,5.17
+girl,5.38
+guns,4.66
+cookware,2.58
+guinea pig,3.8
+baseball cards,4.33
+beer,4.7
+video game console,4.05
+toddler,3.83
+horse,4.76
+gin,3.68
+socks,4.03
+pillows,3.5
+game system,5.33
+souvenirs,3.18
+phone numbers,4.81
+technology,5.09
+partner,4.84
+pottery,3.7
+tablets,3.91
+items of personal value,4.52
+contacts,4.14
+glasses,4.34
+people living there,5.22
+ssn card,2.82
+loved ones,4.73
+anything alive,4.69
+oxygen,4.25
+mail,4.72
+wedding dress,4.49
+goldfish,3.28
+bank statement,4.75
+torah,3.41
+folder,3.74
+credentials,3.74
+lamp,4.05
+old stuff,5.05
+ice cream,4.47
+titles,4.41
+drinks,4.43
+mattress,3.67
+stuff,5.14
+makeup,4.39
+firefighters,3.63
+hydrant,2.71
+elderly,4.15
+condiments,2.76
+albums,4.19
+favorite toy,4.21
+rug,3.72
+handmade things,3.64
+earbuds,3.06
+kindle,3.81
+favorite photos,4.59
+memory books,4.65
+power tools,4.54
+cousin,4.41
+grandfather,4.24
+grandmother,4.14
+orphan,3.58
+injured,4.51
+rings,4.33
+baby book,5.04
+disabled person,4.27
+fridge,4.02
+microwave,3.8
+tv stand,4.87
+plate,4.55
+fork,4.03
+wardrobe,3.8
+wheelchair,3.86
+money stash,3.54
+treasure,4.17
+memory box,4.61
+novelties,2.63
+video games,5.13
+everything,5.54
+backpack,3.78
+lizard,3.63
+drawings,4.04
+memorable gifts,3.83
+devices,4.59
+home insurance papers,4.42
+jacket,4.32
+sock monkey,3.48
+box,5.04
+airpods,2.7
+essentials,3.57
+me,6.48
+consoles,3.54
+hair products,4.76
+cards,4.76
+dolls,3.81
+radio,5.01
+desktop,3.93
+memorable items,3.91
+trinkets,2.87
+ashes of deceased,3.64
+negatives,3.39
+sketchbooks,2.16
+studies,4.98
+each other,5.56
+bed,5.07
+expensive gadget,3.43
+to go bag,4.76
+exotic animals,3.86
+priceless keepsakes,2.21
+hairbrush,2.35
+table,5.05
+trophies,3.67
+bracelet,3.7
+violin,3.74
+trumpet,3.58
+legos,2.76
+silver,4.81
+will and testament,4.07
+degrees,4.54
+monitor,4.37
+notebook,3.74
+roommate,3.81
+living things,5.16
+human beings,4.16
+belongings,3.56
+fire blanket,4.05
+quilt,3.25
+fire truck,4.55
+fire hydrant,2.71
+mask,4.31
+smoke alarm,4.13
+typewriter,3.26
+historical relics,3.43
+watch,5.34
+firebox,2.37
+small safe,4.94
+lady,4.95
+expensive devices,4.34
+stamp collection,4.05
+backups,3.12
+wedding album,4.61
+personal belongings,3.55
+toilet paper,4.24
+ferret,3.01
+handicapped family,3.42
+sleeping family,4.53
+childhood items,4.32
+reptile,3.25
+expensive belongings,3.53
+car keys,4.35
+vase,3.54
+work bag,4.76
+kids blankie,2.04
+pregnant women,4.52
+unconscious people,3.94
+lives,5.14
+secrets,4.31
+cds,3.63
+significant other,4.95
+niece,3.82
+nephew,4.01
+parrot,3.49
+favorite things,4.9
+explosive items,3.91
+tunes,3.82
+cell,4.87
+other people,5.9
+mortgage paperwork,3.73
+plants,4.71
+grandparents,3.88
+old photos,4.78
+spoons,3.28
+scriptures,3.54
+craft projects,4.18
+spouse,3.95
+dcor,1.04
+snake,4.23
+homework,4.13
+dishes,4.13
+ashes,3.93
+hose,3.73
+music equipment,4.79
+essential work equipment,4.41
+father,5.26
+sweater,3.78
+hamster,3.31
+ashes of loved one,3.89
+debit,3.62
+the cat,4.78
+the dog,5.1
+anything you can grab,4.48
+deed title,3.73
+older persons,4.31
+your kid,4.98
+cellphone,3.65
+everything and everyone,5.2
+house deed,3.75
+charger for phone,3.63
+little brother,5.02
+little sister,4.89
+little sibling,3.61
+smoke detector,3.66
+gaming device,4.19
+your phone,5.27
+charger,3.64
+precious jewelry,3.91
+treasured jewelry,3.08
+any person or animal inside,4.59
+key documents,4.52
+people who work in building,5.14
