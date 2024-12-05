@@ -120,6 +120,11 @@ pwa_lex_results=read_csv(unz("../forager/output/pwa/animals_forager_results.zip"
 
 all_lexical = rbind(control_lex_results,pwa_lex_results)
 
+#Switch designations
+control_switch_results <- read_csv(unz("../forager/output/control/animals_forager_results.zip","switch_results.csv")) %>% mutate(Group = "Control")
+pwa_switch_results=read_csv(unz("../forager/output/pwa/animals_forager_results.zip","switch_results.csv")) %>% mutate(Group = "PWA")
+
+all_switches = rbind(control_switch_results,pwa_switch_results)
 
 #Fluency x clustering data
 control_indv_results <- read_csv(unz("../forager/output/control/animals_forager_results.zip","individual_descriptive_stats.csv")) %>% mutate(Group = "Control")
@@ -423,7 +428,6 @@ plot1 + plot2
 ```
 #Beta Analyses
 ```{r}
-
 #Filtering to only include best model for each domain type
 all_models<-all_models %>%mutate(foraging_type = as.factor(foraging_type),  
          model_type = fct_recode(foraging_type, 
@@ -497,9 +501,84 @@ subject_best_models%>%
     theme_few() +
     scale_fill_calc()+
   scale_fill_paletteer_d("lisa::SandroBotticelli")
+```
+
+#Using Best Method, Explore Within and Across Cluster Similarity
+```{r}
 
 ```
 
+
+#Exploring aphasia subtypes
+```{r}
+#Looking at distribution of best models across subtypes
+pwa_fluency_linked<-pwa_fluency_cutoff %>% mutate(Subject=ID) %>% select(Subject, LangDx) %>% unique()
+subject_best_models%>% filter(Group=="PWA") %>% left_join(pwa_fluency_linked,by="Subject") %>%
+  mutate(LangDx = str_to_lower(LangDx)) %>%mutate_all(~str_replace_all(., "\\s+", "")) %>%
+    group_by(Group, LangDx, model_type) %>%
+    count() %>%
+    ggplot(aes(x = LangDx, y = n, group = model_type, fill = model_type)) +
+    geom_col() +
+    labs(y = "number of participants", x = "", fill = "best model type") +  
+    theme_few() +
+    scale_fill_calc()+
+  scale_fill_paletteer_d("lisa::SandroBotticelli")
+
+#Exploring Lexical differences
+#Probably need to integrate those anomic subtypes
+
+#semantic
+sem_sim_comparison %>%
+  filter(Group == "PWA") %>%
+  left_join(pwa_fluency_linked, by = "Subject") %>%
+  mutate(LangDx = str_to_lower(LangDx)) %>%
+  mutate(LangDx = str_replace_all(LangDx, "\\s+", "")) %>%
+  filter(!is.na(LangDx) & !is.na(avg_sem_sim)) %>%
+  mutate(LangDx = factor(LangDx)) %>%  
+  ggplot(aes(x = LangDx, y = avg_sem_sim, color = LangDx)) +
+  geom_beeswarm(alpha = 0.6, cex = 2,size=3) +  
+  labs(y = 'Semantic Similarity', x = '') +
+  theme_few() +
+  theme(legend.position = "none") +
+  scale_color_paletteer_d("lisa::SandroBotticelli")
+
+#Phonological
+phon_sim_comparison %>%
+  filter(Group == "PWA") %>%
+  left_join(pwa_fluency_linked, by = "Subject") %>%
+  mutate(LangDx = str_to_lower(LangDx)) %>%
+  mutate(LangDx = str_replace_all(LangDx, "\\s+", "")) %>%
+  filter(!is.na(LangDx) & !is.na(avg_phon_sim)) %>%
+  mutate(LangDx = factor(LangDx)) %>%  
+  ggplot(aes(x = LangDx, y = avg_phon_sim, color = LangDx)) +
+  geom_beeswarm(alpha = 0.6, cex = 2, size=3) +  
+  labs(y = 'Phonological Similarity', x = '') +
+  theme_few() +
+  theme(legend.position = "none") +
+  scale_color_paletteer_d("lisa::SandroBotticelli")
+
+
+#frequency
+freq_comparison %>%
+  filter(Group == "PWA") %>%
+  left_join(pwa_fluency_linked, by = "Subject") %>%
+  mutate(LangDx = str_to_lower(LangDx)) %>%
+  mutate(LangDx = str_replace_all(LangDx, "\\s+", "")) %>%
+  filter(!is.na(LangDx) & !is.na(avg_freq)) %>%
+  mutate(LangDx = factor(LangDx)) %>%  
+  ggplot(aes(x = LangDx, y = avg_freq, color = LangDx)) +
+  geom_beeswarm(alpha = 0.6, cex = 2, size=3) +  
+  labs(y = 'Word Frequency', x = '') +
+  theme_few() +
+  theme(legend.position = "none") +
+  scale_color_paletteer_d("lisa::SandroBotticelli")
+
+
+```
+#Explore Lexical Metrics x Other Relevant Battery Measures
+```{r}
+
+```
 
 
 
