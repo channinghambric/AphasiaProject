@@ -73,6 +73,9 @@ cutoff_id_count <- pwa_fluency_cutoff %>%
   summarize(Unique_IDs = n_distinct(ID)) %>%
   print()
 
+#recoding rec broca's anomic to just anomic
+pwa_fluency_cutoff<-pwa_fluency_cutoff%>%
+  mutate(LangDx = ifelse(LangDx == "anomic(rec.broca's)", "anomic", LangDx))
 
 #dx distribution of retained ids
 pwa_fluency_dist<- pwa_fluency_cutoff %>% group_by(LangDx) %>%
@@ -93,6 +96,13 @@ fluency_comp<-comb_fluency %>% select(ID,Group,fluency_score) %>%unique()
 fluency<- lm(data=fluency_comp,fluency_score~Group)
 summary(fluency)
 
+
+#Does fluency score sig differ by aphasia subtype
+fluency_pwa_comp<-pwa_fluency_cutoff %>% select(ID,LangDx,fluency_score) %>%unique()
+fluency_pwa<- lm(data=fluency_pwa_comp,fluency_score~LangDx)
+summary(fluency_pwa)
+car::Anova(fluency_pwa)
+
 #Plots
 #Basic Fluency Comparison
 comb_fluency %>% select(ID,Group,fluency_score) %>%unique()%>%
@@ -101,6 +111,15 @@ comb_fluency %>% select(ID,Group,fluency_score) %>%unique()%>%
     labs(y = 'number of items produced', x = "") +
     theme_few() + theme(legend.position = "none")+
     scale_fill_paletteer_d("lisa::SandroBotticelli")
+
+#By Subtype
+pwa_fluency_cutoff %>% select(ID,LangDx,fluency_score) %>%unique()%>%
+  ggplot(aes(x = LangDx, y = fluency_score, fill = LangDx)) +
+    geom_boxplot(color = "black") +
+    labs(y = 'number of items produced', x = "") +
+    theme_few() + theme(legend.position = "none")+
+    scale_fill_paletteer_d("lisa::SandroBotticelli")
+
 
 #Eyeballing Distribution of Fluency Performance
 comb_fluency %>%
@@ -145,7 +164,7 @@ all_models = rbind(control_model_results,pwa_model_results)
 #Lexical Analyses
 
 ```{r}
-#Does avg semantic similarity differ by domain/type
+#Does avg semantic similarity differ by group
 sem_sim_comparison = all_lexical %>% group_by(Group, Subject) %>%
   summarise(avg_sem_sim = mean(Semantic_Similarity),
             items = n()) 
@@ -155,7 +174,7 @@ summary(sem_sim_lm)
 car::Anova(sem_sim_lm)
 
 
-#Does avg phonological similarity differ by domain/type
+#Does avg phonological similarity differ by group
 phon_sim_comparison = all_lexical %>% group_by(Group,Subject) %>%
   summarise(avg_phon_sim = mean(Phonological_Similarity),
             items = n()) 
@@ -165,7 +184,7 @@ summary(phon_sim_lm)
 car::Anova(phon_sim_lm)
 
 
-#Does avg frequency differ by domain/type
+#Does avg frequency differ by group
 freq_comparison = all_lexical %>% group_by(Group,Subject) %>%
   summarise(avg_freq = mean(Frequency_Value),
             items = n()) 
@@ -204,31 +223,12 @@ freq <- freq_comparison %>%
     theme_few() +theme(legend.position = "none")+
     scale_fill_paletteer_d("lisa::SandroBotticelli") 
 freq
+
+sem+phon+freq
 ```
 
 #Lexical x Fluency
 ```{r}
-#Numb items produced x lexical data
-numb_sem <- all_indv %>%
-  ggplot(aes(y = Semantic_Similarity_mean, x = Numb_of_Items, group = Group, color = Group)) +
-  labs(x = "Number of Items", y = "mean semantic similarity") +
-  theme_few() +  
-  geom_smooth(method = "lm", se = TRUE,size=3)  +
-  scale_color_paletteer_d("lisa::SandroBotticelli")
-numb_sem
-
-numb_phon <- all_indv %>%
-  ggplot(aes(y= Phonological_Similarity_mean, x = Numb_of_Items, group = Group, color = Group )) +
-  labs(x = "number of items", y = "mean phonological similarity") +
-    theme_few() +  geom_smooth(method = "lm", se = TRUE,size=3) +scale_color_paletteer_d("lisa::SandroBotticelli")
-numb_phon
-
-numb_freq<- all_indv %>%
-  ggplot(aes(y= Frequency_Value_mean, x = Numb_of_Items, group = Group, color = Group)) +
-  labs(x = "number of items", y = "mean word frequency") +
-    theme_few() +  geom_smooth(method = "lm", se = TRUE,size=3)  +scale_color_paletteer_d("lisa::SandroBotticelli")
-numb_freq
-
 
 #Does mean semantic similarity x Group predict numb items produced
 semsim_model = lm(data = all_indv, 
@@ -249,6 +249,28 @@ freq_model = lm(data = all_indv,
 summary(freq_model)
 car::Anova(freq_model)
 #Sig GroupxFreq intx
+
+#Plots
+numb_sem <- all_indv %>%
+  ggplot(aes(x = Semantic_Similarity_mean, y = Numb_of_Items, group = Group, color = Group)) +
+  labs(y = "Number of Items", x = "mean semantic similarity") +
+  theme_few() +  
+  geom_smooth(method = "lm", se = TRUE,size=3)  +
+  scale_color_paletteer_d("lisa::SandroBotticelli")
+numb_sem
+
+numb_phon <- all_indv %>%
+  ggplot(aes(x= Phonological_Similarity_mean, y = Numb_of_Items, group = Group, color = Group )) +
+  labs(y = "number of items", x = "mean phonological similarity") +
+    theme_few() +  geom_smooth(method = "lm", se = TRUE,size=3) +scale_color_paletteer_d("lisa::SandroBotticelli")
+numb_phon
+
+numb_freq<- all_indv %>%
+  ggplot(aes(x= Frequency_Value_mean, y = Numb_of_Items, group = Group, color = Group)) +
+  labs(y = "number of items", x = "mean word frequency") +
+    theme_few() +  geom_smooth(method = "lm", se = TRUE,size=3)  +scale_color_paletteer_d("lisa::SandroBotticelli")
+numb_freq
+
 
 #Reverse it
 
@@ -271,6 +293,27 @@ freq_model = lm(data = all_indv,
                 Frequency_Value_mean ~ Numb_of_Items*Group)
 summary(freq_model)
 car::Anova(freq_model)
+
+#Numb items produced x lexical data
+numb_sem <- all_indv %>%
+  ggplot(aes(y = Semantic_Similarity_mean, x = Numb_of_Items, group = Group, color = Group)) +
+  labs(x = "Number of Items", y = "mean semantic similarity") +
+  theme_few() +  
+  geom_smooth(method = "lm", se = TRUE,size=3)  +
+  scale_color_paletteer_d("lisa::SandroBotticelli")
+numb_sem
+
+numb_phon <- all_indv %>%
+  ggplot(aes(y= Phonological_Similarity_mean, x = Numb_of_Items, group = Group, color = Group )) +
+  labs(x = "number of items", y = "mean phonological similarity") +
+    theme_few() +  geom_smooth(method = "lm", se = TRUE,size=3) +scale_color_paletteer_d("lisa::SandroBotticelli")
+numb_phon
+
+numb_freq<- all_indv %>%
+  ggplot(aes(y= Frequency_Value_mean, x = Numb_of_Items, group = Group, color = Group)) +
+  labs(x = "number of items", y = "mean word frequency") +
+    theme_few() +  geom_smooth(method = "lm", se = TRUE,size=3)  +scale_color_paletteer_d("lisa::SandroBotticelli")
+numb_freq
 
 
 ```
@@ -359,7 +402,7 @@ control_best_method<- group_best_model$full_method[1]
 pwa_best_method<-group_best_model$full_method[2]
 
 
-all_indv<-all_indv %>% mutate(full_method=paste(method,param1,param2,param3,sep="_"))
+all_indv<-all_indv%>%mutate(full_method=paste(method,param1,param2,param3,sep="_"))
 
 best_control_clusters = all_indv %>% filter(Group=="Control") %>% filter(full_method==control_best_method) %>%
   summarise(
@@ -488,7 +531,7 @@ diff_type_best_beta_freq_model = lm(data = group_best_beta_values %>% filter(bet
 summary(diff_type_best_beta_freq_model)
 car::Anova(diff_type_best_beta_freq_model)
 
-
+#Distribution of best model types across participants
 subject_best_models = all_models %>% 
   group_by(Subject,Group) %>%
   slice_min(Negative_Log_Likelihood_Optimized)
@@ -501,6 +544,31 @@ subject_best_models%>%
     labs(y = "number of participants", x = "", fill = "best model type") +  
     theme_few() +
     scale_fill_calc()+
+  scale_fill_paletteer_d("lisa::SandroBotticelli")
+
+
+# Across aphasia subtypes: Distribution of best model types across participants
+subject_best_models <- subject_best_models %>%
+  filter(Group == "PWA") %>%
+  left_join(
+    pwa_fluency_cutoff %>%
+      rename(Subject = "ID") %>%
+      select(Subject, LangDx) %>%
+      distinct(),  # Use `distinct()` instead of `unique()`
+    by = "Subject"
+  ) %>%
+  group_by(LangDx, model_type) %>%
+  count()
+
+subject_best_models %>%
+  ggplot(aes(x = LangDx, y = n, group = model_type, fill = model_type)) +
+  geom_col() +
+  labs(
+    y = "Number of Participants", 
+    x = "", 
+    fill = "Best Model Type"
+  ) +
+  theme_few() +
   scale_fill_paletteer_d("lisa::SandroBotticelli")
 ```
 
