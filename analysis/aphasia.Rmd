@@ -582,6 +582,8 @@ best_control_switches = all_switches %>% filter(Group=="Control") %>% filter(ful
 best_pwa_switches = all_switches %>% filter(Group=="PWA") %>%filter(full_method==pwa_best_method) %>%
     mutate(Group="PWA")
 
+comb_best_switches = rbind(best_control_switches, best_pwa_switches)
+
 comb_best_switches$Switch_Value[comb_best_switches$Switch_Value == 2] <- 1
 
 
@@ -603,9 +605,9 @@ switches_recoded <- comb_best_switches %>%
     # Add a random ID for each unique Cluster_ID within each Subject
     Cluster_Random_ID = sapply(Cluster_ID, function(x) UUIDgenerate())
   ) %>%
+  mutate(item_no = row_number())%>%
   ungroup() %>%
-  left_join(all_lexical, by = c("Subject", "Fluency_Item")) %>%
-  rename("Group" = "Group.y")
+  left_join(all_lexical %>% group_by(Subject) %>% mutate(item_no = row_number()))
 
 
 #Does avg within cluster similarity differ by Group  - essentially treating each cluster as an id variable
@@ -625,7 +627,6 @@ group_freq_model<-lmer(data=group_comp, Frequency_Value~Group +(1|Cluster_Random
 summary(group_freq_model)
 car::Anova(group_freq_model)
 #sig HIGHER for PWA
-
 
 # Looking at within cluster similarities/frequency by cluster number
 group_avg_summary <- switches_recoded %>%
@@ -774,6 +775,74 @@ p3b
 
 
 ```
+
+# Alt analyses with switches_recoded
+
+```{r}
+switches_recoded = switches_recoded %>% 
+  mutate(Switch = ifelse(is.na(Switch), "Cluster Transition", Switch))
+
+switches_recoded %>%
+  group_by(Group, Switch) %>%
+   tidyboot_mean(Semantic_Similarity, nboot = 1000, na.rm = T) %>% 
+  ggplot(aes(x = Switch, y = empirical_stat, fill = Group)) +
+    geom_bar(stat = 'identity', position = "dodge") +
+    geom_errorbar(aes(ymin = ci_lower, ymax = ci_upper), width = 0.05, 
+                  position = position_dodge(0.9))+
+  labs(
+    title = "Average Semantic Similarity within Clusters and at Switch Points",
+    y = "Average Semantic Similarity",
+    color = "Group"
+  ) +
+  theme_few() +
+  scale_fill_paletteer_d("wesanderson::Cavalcanti1")
+
+switches_recoded %>% 
+  mutate(Switch = ifelse(is.na(Switch), "Cluster Transition", Switch)) %>%
+  group_by(Group, Switch) %>%
+   tidyboot_mean(Phonological_Similarity, nboot = 1000, na.rm = T) %>% 
+  ggplot(aes(x = Switch, y = empirical_stat, fill = Group)) +
+    geom_bar(stat = 'identity', position = "dodge") +
+    geom_errorbar(aes(ymin = ci_lower, ymax = ci_upper), width = 0.05, 
+                  position = position_dodge(0.9))+
+  labs(
+    title = "Average Phonological Similarity within Clusters and at Switch Points",
+    y = "Average Phonological Similarity",
+    color = "Group"
+  ) +
+  theme_few() +
+  scale_fill_paletteer_d("wesanderson::Cavalcanti1")
+
+switches_recoded %>% 
+  mutate(Switch = ifelse(is.na(Switch), "Cluster Transition", Switch)) %>%
+  group_by(Group, Switch) %>%
+   tidyboot_mean(Frequency_Value, nboot = 1000, na.rm = T) %>% 
+  ggplot(aes(x = Switch, y = empirical_stat, fill = Group)) +
+    geom_bar(stat = 'identity', position = "dodge") +
+    geom_errorbar(aes(ymin = ci_lower, ymax = ci_upper), width = 0.05, 
+                  position = position_dodge(0.9))+
+  labs(
+    title = "Average Frequency within Clusters and at Switch Points",
+    y = "Average Frequency",
+    color = "Group"
+  ) +
+  theme_few() +
+  scale_fill_paletteer_d("wesanderson::Cavalcanti1")
+
+## model
+
+sw_model = lmer(data = switches_recoded, Semantic_Similarity ~ Group*Switch + (1|Subject))
+car::Anova(sw_model)
+
+pw_model = lmer(data = switches_recoded, Phonological_Similarity ~ Group*Switch + (1|Subject))
+car::Anova(pw_model)
+
+# item frequency does not chnage with subject, leads to singular model
+fw_model = lm(data = switches_recoded, Frequency_Value ~ Group*Switch)
+summary(fw_model)
+car::Anova(fw_model)
+```
+
 #Explore Lexical Metrics x Other Relevant Battery Measures
 ```{r}
 #TBD
