@@ -70,7 +70,7 @@ pwa_fluency_dropped_ids <- pwa_fluency %>%
   filter(fluency_score < 10)
 
 cutoff_id_count <- pwa_fluency_cutoff %>%
-  summarize(Unique_IDs = n_distinct(ID)) %>%
+  summarise(Unique_IDs = n_distinct(ID)) %>%
   print()
 
 #recoding rec broca's anomic to just anomic
@@ -79,7 +79,7 @@ pwa_fluency_cutoff<-pwa_fluency_cutoff%>%
 
 #dx distribution of retained ids
 pwa_fluency_dist<- pwa_fluency_cutoff %>% group_by(LangDx) %>%
-  summarize(Unique_Participants = n_distinct(ID))
+  summarise(Unique_Participants = n_distinct(ID))
 pwa_fluency_dist
 
 #Writing cutoff file to csv
@@ -572,58 +572,68 @@ subject_best_models %>%
   scale_fill_paletteer_d("lisa::SandroBotticelli")
 ```
 
-#Using Best Method, Explore Within Cluster & Transition Similarity
+# Using Best Method, Explore Within Cluster & Transition Similarity
 ```{r}
 all_switches<- all_switches %>% separate(Switch_Method, into = c("method", "param1", "param2", "param3"), sep = "_", fill = "right") 
 all_switches<-all_switches %>% mutate(full_method=paste(method,param1,param2,param3,sep="_"))
 
-best_control_switches = all_switches %>% filter(Group=="Control") %>% filter(full_method==control_best_method)%>%
-    mutate(Group="Control")
-best_pwa_switches = all_switches %>% filter(Group=="PWA") %>%filter(full_method==pwa_best_method) %>%
-    mutate(Group="PWA")
+# Combine the best switches for Control and PWA into one dataset
+comb_best_switches <- all_switches %>%
+  filter(
+    (Group == "Control" & full_method == control_best_method) |
+    (Group == "PWA" & full_method == pwa_best_method)
+  ) %>%
+  mutate(Group = if_else(Group == "Control", "Control", "PWA")) %>%
+  mutate(Switch_Value = if_else(Switch_Value == 2, 1, Switch_Value))
 
-comb_best_switches = rbind(best_control_switches, best_pwa_switches)
+#Calculate item_no consistently in all_lexical
+all_lexical <- all_lexical %>%
+  group_by(Subject) %>%
+  mutate(item_no = row_number())
 
-comb_best_switches$Switch_Value[comb_best_switches$Switch_Value == 2] <- 1
-
-
-#WITHIN CLUSTERS
-#Recoding clusters
+# Calculate item_no in switches_recoded
 switches_recoded <- comb_best_switches %>%
   group_by(Subject) %>%
   mutate(
-    # Create Cluster_ID by tracking each transition of Switch_Value 1 or 0 to 1 for each subject
-    Cluster_ID = cumsum(Switch_Value == 1)
-  ) %>%
-  mutate(
-    # Create the Switch column: mark only the first row of each Cluster_ID as a transition
+    Cluster_ID = cumsum(Switch_Value == 1),
     Switch = case_when(
-      row_number() == 1 ~ "Switch_Transition",  # Mark the first row of each Cluster_ID
-      lag(Cluster_ID) != Cluster_ID ~ "Switch_Transition",  # If Cluster_ID changes, mark as transition
-      TRUE ~ NA_character_  # All other rows within a cluster are not transitions
-    ),
-    # Add a random ID for each unique Cluster_ID within each Subject
-    Cluster_Random_ID = sapply(Cluster_ID, function(x) UUIDgenerate())
+      row_number() == 1 ~ "Switch_Transition",
+      Cluster_ID != lag(Cluster_ID) ~ "Switch_Transition",
+      TRUE ~ NA_character_
+    )
   ) %>%
-  mutate(item_no = row_number())%>%
+  group_by(Subject, Cluster_ID) %>%
+  mutate(
+    Cluster_Random_ID = UUIDgenerate(n = 1)
+  ) %>%
   ungroup() %>%
-  left_join(all_lexical %>% group_by(Subject) %>% mutate(item_no = row_number()))
+  group_by(Subject) %>%  # Ensure consistent row numbering
+  mutate(item_no = row_number()) %>%
+  ungroup()
+
+# Perform the join
+switches_recoded <- switches_recoded %>%
+  left_join(
+    all_lexical %>%
+      select(-Group),  # Remove conflicting Group column
+    by = c("Subject", "item_no")
+  )
 
 
 #Does avg within cluster similarity differ by Group  - essentially treating each cluster as an id variable
-group_comp<-switches_recoded %>%select(Cluster_Random_ID,Group,Semantic_Similarity,Phonological_Similarity,Frequency_Value)
+group_comp<-switches_recoded %>%select(Subject,Cluster_Random_ID,Group,Semantic_Similarity,Phonological_Similarity,Frequency_Value)
 
-group_sem_model<-lmer(data=group_comp, Semantic_Similarity~Group +(1|Cluster_Random_ID))
+group_sem_model<-lmer(data=group_comp, Semantic_Similarity~Group +(1|Cluster_Random_ID:Subject))
 summary(group_sem_model)
 car::Anova(group_sem_model)
 #sig lower for PWA
 
-group_phon_model<-lmer(data=group_comp, Phonological_Similarity~Group +(1|Cluster_Random_ID))
+group_phon_model<-lmer(data=group_comp, Phonological_Similarity~Group +(1|Cluster_Random_ID:Subject))
 summary(group_phon_model)
 car::Anova(group_phon_model)
 #sig lower for PWA
 
-group_freq_model<-lmer(data=group_comp, Frequency_Value~Group +(1|Cluster_Random_ID))
+group_freq_model<-lmer(data=group_comp, Frequency_Value~Group +(1|Cluster_Random_ID:Subject))
 summary(group_freq_model)
 car::Anova(group_freq_model)
 #sig HIGHER for PWA
@@ -695,7 +705,7 @@ p3
 #TRANSITIONS
 switches_comp <- switches_recoded %>%
   group_by(Subject, Group) %>%
-  slice(-1) %>%  # Removes the first row from each group
+  slice(-1) %>%  # Removes the first row from each subject
   filter(!is.na(Switch)) %>%   # Removes rows with NA in the Switch column
   mutate(
     # Add a sequential Switch_Number for each participant (Subject) and Group
@@ -780,7 +790,7 @@ p3b
 
 ```{r}
 switches_recoded = switches_recoded %>% 
-  mutate(Switch = ifelse(is.na(Switch), "Cluster Transition", Switch))
+  mutate(Switch = ifelse(is.na(Switch), "Within Cluster Transition", Switch))
 
 switches_recoded %>%
   group_by(Group, Switch) %>%
@@ -835,6 +845,7 @@ sw_model = lmer(data = switches_recoded, Semantic_Similarity ~ Group*Switch + (1
 car::Anova(sw_model)
 
 pw_model = lmer(data = switches_recoded, Phonological_Similarity ~ Group*Switch + (1|Subject))
+summary()
 car::Anova(pw_model)
 
 # item frequency does not chnage with subject, leads to singular model
