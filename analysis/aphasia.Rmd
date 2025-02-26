@@ -140,14 +140,18 @@ all_switches = rbind(control_switch_results,pwa_switch_results)%>% separate(Swit
 
 # Lexical Analyses 
 ```{r}
-#INCORPORATE LENGTH MEASURES
+#import words lengths
+control_lengths<-read.csv("control_wordlength.csv") %>%rename("Subject"="ID") %>%mutate(Group="Control")
+pwa_lengths<-read.csv("pwa_wordlength.csv")%>%rename("Subject"="ID")%>%mutate(Group="PWA")
+comb_wordlength<-rbind(control_lengths,pwa_lengths
+                       )
 #setting up the df
 lexical_analysis_data<-all_indv %>% select(Subject, Group, Semantic_Similarity_mean, Phonological_Similarity_mean, Frequency_Value_mean, 
          fluency_score) %>% na.omit() %>%
   rename("semantic" = "Semantic_Similarity_mean", 
          "phonological" = "Phonological_Similarity_mean",
          "frequency" = "Frequency_Value_mean")%>%
-  pivot_longer(names_to = "cue", cols=c(semantic,phonological,frequency))
+  pivot_longer(names_to = "cue", cols=c(semantic,phonological,frequency)) %>%left_join(comb_wordlength,by="Subject")
 
 #Does fluency score differ by category type
 fluency_lm = lm(data = lexical_analysis_data, fluency_score ~ Group)
