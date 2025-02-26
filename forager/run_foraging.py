@@ -346,8 +346,9 @@ def indiv_desc_stats(lexical_results, switch_results = None):
                 ct += 1
                 if x == 1:
                     num_switches += 1
+                    ct = ct-1
                     cluster_lengths.append(ct)
-                    ct = 0
+                    ct = 1
             if ct != 0:
                 cluster_lengths.append(ct)
             avg = sum(cluster_lengths) / len(cluster_lengths)
