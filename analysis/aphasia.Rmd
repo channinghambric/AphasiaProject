@@ -25,6 +25,7 @@ library(knitr)
 library(ggridges)
 library(patchwork)
 library(uuid)
+library(data.table)
 
 ```
 
@@ -142,21 +143,24 @@ all_switches = rbind(control_switch_results,pwa_switch_results)%>% separate(Swit
 ```{r}
 #import words lengths
 control_lengths<-read.csv("control_wordlength.csv") %>%rename("Subject"="ID") %>%mutate(Group="Control")
-pwa_lengths<-read.csv("pwa_wordlength.csv")%>%rename("Subject"="ID")%>%mutate(Group="PWA")
-comb_wordlength<-rbind(control_lengths,pwa_lengths
-                       )
+pwa_lengths<-read.csv("pwa_wordlength.csv")%>%rename("Subject"="ID")%>%mutate(Group="PWA")%>%mutate(Subject=as.factor(Subject))
+comb_wordlength <- rbind(control_lengths, pwa_lengths) %>%
+  group_by(Subject, Group) %>%
+  summarize(avg_length = mean(Phoneme.Count, na.rm = TRUE))
+                       
 #setting up the df
 lexical_analysis_data<-all_indv %>% select(Subject, Group, Semantic_Similarity_mean, Phonological_Similarity_mean, Frequency_Value_mean, 
          fluency_score) %>% na.omit() %>%
   rename("semantic" = "Semantic_Similarity_mean", 
          "phonological" = "Phonological_Similarity_mean",
          "frequency" = "Frequency_Value_mean")%>%
-  pivot_longer(names_to = "cue", cols=c(semantic,phonological,frequency)) %>%left_join(comb_wordlength,by="Subject")
+  pivot_longer(names_to = "cue", cols=c(semantic,phonological,frequency)) %>%left_join(comb_wordlength,by=c("Subject","Group"))
 
-#Does fluency score differ by category type
-fluency_lm = lm(data = lexical_analysis_data, fluency_score ~ Group)
+#Does fluency score differ by group, avg word length as a covariate (*Tested as intx, no sig diff in models)
+fluency_lm = lm(data = lexical_analysis_data, fluency_score ~ Group+avg_length)
 summary(fluency_lm)
 car::Anova(fluency_lm)
+
 
 #Does semantic similarity, phonological similarity, and frequency differ across Groups
 # Run lm() for each cue and extract results
@@ -164,13 +168,15 @@ lexical_results <- lexical_analysis_data  %>%
   group_by(cue) %>%                                   # Group by cue
   nest() %>%                                         # Nest data by cue
  mutate(
-    model = map(data, ~ lm(value ~ Group * fluency_score, data = .)) # Fit models
+    model = map(data, ~ lm(value ~ Group * fluency_score+avg_length, data = .)) # Fit models
   )
 #View results
 model_summaries <- lexical_results %>%
   mutate(model_summary = map(model, broom::tidy)) %>%
   unnest(model_summary)
 View(model_summaries)
+
+
 
 ```
 
@@ -188,7 +194,20 @@ fluency_plot <- lexical_analysis_data %>%
     plot.title = element_text(size = 18)  
   ) +
   scale_fill_paletteer_d("lisa::SandroBotticelli") 
-fluency_plot
+
+length_plot <- lexical_analysis_data %>%
+  ggplot(aes(x = Group, y = avg_length, fill = Group)) +
+  geom_boxplot(color = "black") +
+  ylim(2,6) +  
+  labs(y = 'Average Word Length (# of Phonemes)', x = "Group", title = "") +
+  theme_few() +
+  theme(
+    aspect.ratio = 1, axis.text.y = element_text(size = 14),axis.text.x = element_text(size = 14),
+    legend.position = 'right',
+    plot.title = element_text(size = 18)  
+  ) +
+  scale_fill_paletteer_d("lisa::SandroBotticelli") 
+fluency_plot+length_plot
 
 
 plots_lexical <- lexical_results %>% 
@@ -202,16 +221,16 @@ plots_lexical <- lexical_results %>%
       theme(aspect.ratio = 1.5, legend.position = "top")))
 
 
-plots_lexical$emmip_plot[[1]]+plots_lexical$emmip_plot[[2]]
+plots_lexical$emmip_plot[[1]]+plots_lexical$emmip_plot[[2]]+plots_lexical$emmip_plot[[3]]
 
 ```
 
 # Best Models
 ```{r}
 #Getting N
-just_fluency<-full_indv_data %>%select(Subject,Group,fluency_score) %>%rename("N"="fluency_score") %>%na.omit() %>%unique()
+just_fluency<-all_indv %>%select(Subject,Group,fluency_score) %>%rename("N"="fluency_score") %>%na.omit() %>%unique()
 # Extract random model's nLL for each Subject x Group
-random_nLL_lookup <- full_model_data %>%
+random_nLL_lookup <- all_models %>%
   group_by(Subject, Group) %>%
   filter(model_type == "random") %>%
   mutate(random_k = 1) %>% 
@@ -219,7 +238,7 @@ random_nLL_lookup <- full_model_data %>%
 
 
 #setting up parameter matching
-full_model_data_parameters<-full_model_data %>%mutate(parameter_link=paste(model_type,method,structure,sep="_"))
+full_model_data_parameters<-all_models %>%mutate(parameter_link=paste(model_type,method,sep="_"))
 
 #importing parameter counts
 parameters<-read.csv("Aphasia_BIC_Parameters.csv") %>%select(parameter_link,k)
@@ -233,42 +252,28 @@ bic <- full_model_data_parameters %>%
     randomBIC = random_k * log(N) - 2 * (-random_nLLs))
 
 
-#EXPLORATORY
-#looking at distribution
-#negatively skewed 
-bic %>%
-  ggplot( aes(x=optimalBIC, fill=domain)) +
-    geom_density(fill="#69b3a2", color="#e9ecef", alpha=0.8)+facet_wrap(~domain)
+#lowest BIC model per participant
+lowest_bic = bic %>%
+  group_by(Subject) %>%
+  slice_min(optimalBIC)
 
-#sum BIC
-sum_bic = bic %>%
-  group_by(Group,domain,everything) %>%
-  summarise(sumBIC = sum(optimalBIC)) %>%
-  arrange(sumBIC) %>%
-  slice(1) %>% 
-  ungroup() 
-kable(sum_bic)
+#Looking at distribution
+lowest_bic %>%
+  ggplot(aes(x = optimalBIC, fill = Group)) + facet_wrap(~Group)+
+  geom_density(fill = "#69b3a2", color = "#e9ecef", alpha = 0.8) +
+  xlim(-600, 0)
 
-#the phonological models better when looking at delta BIC
+
 #median delta BIC
 median_delta_bic = bic %>% 
   mutate(deltaBIC  = randomBIC - optimalBIC) %>%
-  group_by(Group,domain,everything) %>%
+  group_by(Group,everything) %>%
   summarise(medianBIC = median(deltaBIC)) %>%
   arrange(medianBIC) %>%
   slice(1) %>% 
   ungroup() 
 kable(median_delta_bic)
 
-#mean delta BIC
-mean_delta_bic = bic %>% 
-  mutate(deltaBIC  = randomBIC - optimalBIC) %>%
-  group_by(Group,domain,everything) %>%
-  summarise(meanBIC = mean(deltaBIC)) %>%
-  arrange(meanBIC) %>%
-  slice(1) %>% 
-  ungroup() 
-kable(mean_delta_bic)
 
 ```
 
@@ -276,8 +281,8 @@ kable(mean_delta_bic)
 # Beta Analyses
 ```{r}
 #Filtering full data to only include best model for each domain type
-best_models <- full_model_data %>%
-  filter(paste(Group,everything) %in% paste(median_bic$Group, median_bic$everything)) %>%
+best_models <- all_models %>%
+  filter(paste(Group,everything) %in% paste(median_delta_bic$Group, median_delta_bic$everything)) %>%
   group_by(Group)
 
 #Separating out betas
@@ -328,18 +333,18 @@ beta_values %>%
 # Clustering Analyses
 ```{r}
 #filtering to only include best method from above
-best_clusters <- full_indv_data %>%
+best_clusters <- all_indv%>%
   filter(paste(Group, full_method) %in% paste(best_models$Group, best_models$full_method)) %>%select(-fluency_score)%>% #this is full of NAs & produces mismatch .x/.y error, so dropping
   group_by(Group) %>%left_join(lexical_analysis_data%>%select(Subject,Group,fluency_score)%>%unique(), by = c("Subject", "Group")) #adding fluency_score back in
 
 #When using the best method for each Group, does avg cluster mean differ by Group x domain
-#number of items produced as a covariate
-cluster_size_lm = lm(data = best_clusters, Cluster_Size_mean ~ Group * fluency_score)
+#number of items produced as a covariate (intx does not sig add to model)
+cluster_size_lm = lm(data = best_clusters, Cluster_Size_mean ~ Group + fluency_score)
 summary(cluster_size_lm)
 car::Anova(cluster_size_lm)
 
 #When using the best method for each Group, does avg numb switches differ by Group x domain
-switch_numb_lm = lm(data = best_clusters, Number_of_Switches ~Group * fluency_score)
+switch_numb_lm = lm(data = best_clusters, Number_of_Switches ~Group + fluency_score)
 summary(switch_numb_lm)
 car::Anova(switch_numb_lm)
 
@@ -370,12 +375,12 @@ clusters+switches+ plot_layout(ncol = 1)
 # Within Cluster vs Switch Trial Lexical Metrics
 ```{r}
 #filtering to only include best method for each domain
-best_switches <- full_switch_data %>% 
+best_switches <- all_switches %>% 
   filter(paste(Group,full_method) %in% paste(best_models$Group, best_models$full_method)) %>%
   mutate(Switch_Value = if_else(Switch_Value == 2, 1, Switch_Value))
 
 #Calculate item_no consistently in all_lexical to use in joining
-items_lexical_data <- full_lexical_data %>%
+items_lexical_data <- all_lexical %>%
   group_by(Subject, Group) %>%
   mutate(row_id = row_number() - 1)  # Adjust row_id to start at 0 to account for first item
 
@@ -472,29 +477,33 @@ wiac_cluster_plots <- map(plot_configs, ~ {
     theme_few() +
     theme(
       aspect.ratio = 1.5,
-      legend.position = "top",
-      axis.text.x = element_text(hjust = 1)
+      legend.position = "top"
     ) +
    scale_fill_manual(values = c("darkorange4", "coral3"))
 })
 
 wiac_cluster_plots[[1]] 
-wiac_cluster_plots[[2]]  
+wiac_cluster_plots[[2]] 
 wiac_cluster_plots[[3]]
 ```
 
 # Exploring Battery Measures
 ```{r}
-battery<-pwa_dx %>%select(Subject,)
-#semantic measures:
-#phonological output measures:
+battery<-pwa_dx %>% rename("Subject"="Fluency.ID") %>%select(Subject,TCorrPNT,TrueSem,TrueFor,TrueMix,prt,syntot.,camcac.,catprl1)%>%mutate(Subject=as.factor(Subject))
+pwa_avg_length<-pwa_lengths %>%  group_by(Subject) %>%
+  summarize(avg_length = mean(Phoneme.Count, na.rm = TRUE))
+                       
+#filter out controls and join battery data
+#NOTE many IDs have two entries
 
-#Lexical
-#join w/ pwa data
-lexical_battery<-lexical_analysis_data%>%filter(Group=="PWA") %>%left_join(battery,by="Subject")
+#Lexical df
+lexical_battery<-all_indv %>% select(Subject, Group, Semantic_Similarity_mean, Phonological_Similarity_mean, Frequency_Value_mean, 
+         fluency_score) %>% na.omit() %>%filter(Group=="PWA") %>%left_join(battery,by="Subject") %>%left_join(pwa_avg_length,by="Subject")
 
-#Clustering
+#Clustering df
 clusters_battery<-best_clusters %>%filter(Group=="PWA") %>%left_join(battery,by="Subject")
+
+#Add analyses here
 ```
 
 
