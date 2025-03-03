@@ -492,7 +492,7 @@ wiac_cluster_plots[[3]]
 
 battery <- pwa_dx %>%
   rename(Subject = Fluency.ID) %>%
-  select(Subject, TCorrPNT, TrueSem, TrueFor, prt, syntot., camcac., catprl1) %>%
+  select(Subject, TCorrPNT, TrueSem, TrueFor, prt, syntot., camcac., catprl1,nonwdrep..,rhyprl1) %>%
   mutate(
     Subject = as.factor(Subject),
     across(-Subject, as.numeric)  # Convert all other columns to numeric
@@ -515,20 +515,29 @@ pwa_avg_length<-pwa_lengths %>%  group_by(Subject) %>%
 #A word repetition test using the same set of 175 targets as the Philadelphia Naming Test. 
 #Performance is measured by percent correct: M=85.9, SD=14.1, Range=39–100.
 
-#Camels and Cactus Test (camcac)
+#Camels and Cactus Test (camcac.)
 #Test of non-verbal semantic processing in which a pictured item must be matched to the closest associate 
 #among a set of four pictured choices (e.g., wine matched to: grapes, cherry, strawberry,orange). 
 #Performance is measured by percent correct of 64 trials: M=75.2, SD=15.0, Range=25–95.
 
-#Synonymy triplets (syntot)
+#Synonymy triplets (syntot.)
 #Test of verbal semantic processing in which participants must decide which two of three words are most similar in meaning. Half
 #the trials involve nouns (e.g., violin, fiddle, clarinet), the other half
 #verbs (e.g., to repair, to design, to fix). Performance is measured by percent correct of 30 trials: M=79.1, SD=16.9, Range=33–100.
 
-#Semantic category probe test
+#Semantic category probe test (catprl1)
 #Test of semantic short-term memory in which participantslisten to a list of three or more words and must determine whether the final word is from the same category
 #as any of the preceding words by saying or pointing to “Yes” or “No”. The list of words gradually increases and performance is measured as the
 #maximum list length with 75% or higher accuracy: M=2.18, SD=1.28, Range=0.50–6.00.
+
+#Rhyme Probe Test (rhyprl1)
+#Test of phonological short-term memory in which participants listen to a list of three or more words and must determine whether the final word rhymes with any of the preceding words by
+#saying or pointing to “Yes” or “No”. The list of words gradually increases and performance is measured as the maximum list length with 75% or 
+#higher accuracy: M=2.80, SD=1.69,Range=.50–7.31.
+
+#Nonword Repetition Test (nonwdrep..)
+#Pre-recorded nonword targets derived from PNT,  target words were presented to participants for repetition. 
+#Performance is measured by percent correct of 60 trials: M=47.3, SD=25.8, Range=0–98.
 
 #set up dfs
 #NOTE many IDs have two entries 
@@ -550,7 +559,7 @@ clusters_battery<-best_clusters %>%filter(Group=="PWA") %>%left_join(battery,by=
 ## Lexical Analyses
 ```{r}
 
-fluency_battery_lm = lm(data = lexical_battery, fluency_score ~ TCorrPNT+TrueSem+TrueFor+prt+syntot.+camcac.+catprl1+avg_length)
+fluency_battery_lm = lm(data = lexical_battery, fluency_score ~ TCorrPNT+TrueSem+TrueFor+prt+syntot.+camcac.+catprl1+nonwdrep..+rhyprl1+avg_length)
 summary(fluency_battery_lm)
 car::Anova(fluency_battery_lm)
 
@@ -561,7 +570,7 @@ lexical_battery_results <- lexical_battery  %>%
   group_by(cue) %>%                                   # Group by cue
   nest() %>%                                         # Nest data by cue
  mutate(
-    model = map(data, ~ lm(value ~ TCorrPNT+TrueSem+TrueFor+prt+syntot.+camcac.+catprl1+avg_length, data = .)) # Fit models
+    model = map(data, ~ lm(value ~ TCorrPNT+TrueSem+TrueFor+prt+syntot.+camcac.+catprl1+nonwdrep..+rhyprl1+avg_length, data = .)) # Fit models
   )
 #View results
 model_battery_summaries <- lexical_battery_results %>%
@@ -580,7 +589,9 @@ emm_results <- list(
   prt      = emmeans(fluency_battery_lm, ~ prt, cov.reduce = range),
   syntot.  = emmeans(fluency_battery_lm, ~ syntot., cov.reduce = range),
   camcac.  = emmeans(fluency_battery_lm, ~ camcac., cov.reduce = range),
-  catprl1  = emmeans(fluency_battery_lm, ~ catprl1, cov.reduce = range)
+  catprl1  = emmeans(fluency_battery_lm, ~ catprl1, cov.reduce = range),
+  nonwdrep..  = emmeans(fluency_battery_lm, ~ nonwdrep.., cov.reduce = range)
+
 )
 
 #plot sig predictors
@@ -592,6 +603,7 @@ plot_pnt <- emmip(emm_results$TCorrPNT, ~ TCorrPNT, CIs = TRUE) +
   theme_few() +
   theme(aspect.ratio = 1.5, legend.position = "top")
 plot_pnt
+
 
 #Form Errors (PNT)
 plot_TrueFor <- emmip(emm_results$TrueFor, ~ TrueFor, CIs = TRUE) +
@@ -611,6 +623,15 @@ plot_syntot <- emmip(emm_results$syntot., ~ syntot., CIs = TRUE) +
   theme(aspect.ratio = 1.5, legend.position = "top")
 plot_syntot
 
+
+#Nonword repetition
+plot_nwr <- emmip(emm_results$nonwdrep.., ~ nonwdrep.., CIs = TRUE) +
+  labs(title = "",
+       x = "Nonwdrep", 
+       y = "Estimated Fluency Score")  +
+  theme_few() +
+  theme(aspect.ratio = 1.5, legend.position = "top")
+plot_nwr
 
 #the better the performance on the PNT & syntot, the higher the fluency score
 #But those with higher frequency scores also produced more form errors in PNT
