@@ -322,7 +322,7 @@ beta_values %>%
   ) %>%
   mutate(beta = fct_relevel(beta, "Semantic\nSimilarity", "Phonological\nSimilarity", "Word\nFrequency")) %>%
   ggplot(aes(x = beta, y = empirical_stat, group = Group, fill = Group)) +
-  geom_bar(stat = 'identity', position = "dodge") +
+  geom_bar(stat = 'identity', position = "dodge",color="black") +
   geom_errorbar(aes(ymin = ci_lower, ymax = ci_upper), width = 0, position = position_dodge(0.9)) +
   labs(y = bquote(beta ~ "(Parameter Salience)"), x = "") +
   theme_few() +
@@ -466,7 +466,7 @@ wiac_cluster_plots <- map(plot_configs, ~ {
 
   # Plot 
   ggplot(boot_summary, aes(fill = Switch, y = empirical_stat, x = Group)) +
-    geom_bar(stat = "identity", position = "dodge") +
+    geom_bar(stat = "identity", position = "dodge",color="black") +
    geom_errorbar(aes(ymin = ci_lower, ymax = ci_upper), width = 0.05, position = position_dodge(0.9)) +
    labs(
       title = .x$plot_title,
@@ -487,7 +487,7 @@ wiac_cluster_plots[[2]]
 wiac_cluster_plots[[3]]
 ```
 
-# Exploring Battery Measures
+# Exploring Battery Measures for PWA
 ```{r}
 
 battery <- pwa_dx %>%
@@ -550,7 +550,7 @@ clusters_battery<-best_clusters %>%filter(Group=="PWA") %>%left_join(battery,by=
 ## Lexical Analyses
 ```{r}
 
-fluency_battery_lm = lm(data = lexical_battery, fluency_score ~ TCorrPNT+TrueSem+TrueFor+prt+syntot.+camcac.+catprl1)
+fluency_battery_lm = lm(data = lexical_battery, fluency_score ~ TCorrPNT+TrueSem+TrueFor+prt+syntot.+camcac.+catprl1+avg_length)
 summary(fluency_battery_lm)
 car::Anova(fluency_battery_lm)
 
@@ -561,7 +561,7 @@ lexical_battery_results <- lexical_battery  %>%
   group_by(cue) %>%                                   # Group by cue
   nest() %>%                                         # Nest data by cue
  mutate(
-    model = map(data, ~ lm(value ~ TCorrPNT+TrueSem+TrueFor+prt+syntot.+camcac.+catprl1, data = .)) # Fit models
+    model = map(data, ~ lm(value ~ TCorrPNT+TrueSem+TrueFor+prt+syntot.+camcac.+catprl1+avg_length, data = .)) # Fit models
   )
 #View results
 model_battery_summaries <- lexical_battery_results %>%
@@ -586,7 +586,7 @@ emm_results <- list(
 #plot sig predictors
 #PNT
 plot_pnt <- emmip(emm_results$TCorrPNT, ~ TCorrPNT, CIs = TRUE) +
-  labs(title = "PNT by Fluency Score",
+  labs(title = "",
        x = "TCorrPNT", 
        y = "Estimated Fluency Score") +
   theme_few() +
@@ -595,7 +595,7 @@ plot_pnt
 
 #Form Errors (PNT)
 plot_TrueFor <- emmip(emm_results$TrueFor, ~ TrueFor, CIs = TRUE) +
-  labs(title = "Form Errors by Fluency Score",
+  labs(title = "",
        x = "TrueFor", 
        y = "Estimated Fluency Score")  +
   theme_few() +
@@ -604,7 +604,7 @@ plot_TrueFor
 
 #Synonymy (syntot)
 plot_syntot <- emmip(emm_results$syntot., ~ syntot., CIs = TRUE) +
-  labs(title = "Synonymy Judgments by Fluency Score",
+  labs(title = "",
        x = "syntot", 
        y = "Estimated Fluency Score")  +
   theme_few() +
@@ -613,13 +613,13 @@ plot_syntot
 
 
 #the better the performance on the PNT & syntot, the higher the fluency score
-#But those with higher frequency scores also produced more form errors
+#But those with higher frequency scores also produced more form errors in PNT
 ```
 ### Lexical plots
 
 ```{r}
 
-#just significant predictors
+#just significant effects/predictors
 predictors <- c( "syntot.", "camcac.")
 
 plots_lexical <- lexical_battery_results %>% filter(cue=="phonological")%>%
@@ -640,8 +640,8 @@ plots_lexical <- lexical_battery_results %>% filter(cue=="phonological")%>%
 
 plots_lexical$emmip_plot[[1]]
 
-#for verbal semantic processing tasks (syntot), high performance assc with lower inter-item phonological similarity (less interference/more control over semantic processing)
-#for NON verbal (camcac), high score assc with high avg inyter-item phonological similarity
+#for verbal semantic processing/comprehension tasks (syntot), high performance assc with lower inter-item phonological similarity in SFT  (less interference/more control over semantic processing)
+#for NON verbal semantic association/processing tasks (camcac), high score assc with high avg inter-item phonological similarity in SFT
 ```
 ## Cluster Analyses
 ```{r}
