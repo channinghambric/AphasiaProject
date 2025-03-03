@@ -430,8 +430,46 @@ switch_results$model[[2]] %>% summary()
 print("Frequency")
 switch_results$model[[3]] %>% summary()
 
-#phonology
-emmeans(switch_results$model[[2]],pairwise~Group*Switch,simple="Switch",pbkrtest.limit = 35657)
+
+#Looking at ordinal effects of cluster and switch numbers
+switches_recoded_ordinal<-switches_recoded %>% mutate(Switch_Number=as.numeric(Switch_Number),Cluster_Number=as.numeric(Cluster_Number))
+
+
+#Cluster Number
+cluster_results <- switches_recoded_ordinal %>% filter(Switch=="Within Cluster Transition")%>%
+  group_by(cue) %>%                                   
+  nest() %>%                                         
+ mutate(
+    model = map(data, ~ lm(value ~ Group*Cluster_Number, data = .)) 
+  )
+
+#View results
+#large so calling indp
+print("Semantic")
+cluster_results$model[[1]] %>% summary()
+print("phonological")
+cluster_results$model[[2]] %>% summary()
+print("Frequency")
+cluster_results$model[[3]] %>% summary()
+
+
+#Switch Number
+switchpoint_results <- switches_recoded_ordinal %>% filter(Switch=="Switch Trial")%>%
+  group_by(cue) %>%                                   
+  nest() %>%                                         
+ mutate(
+    model = map(data, ~ lm(value ~ Group*Switch_Number, data = .)) 
+  )
+
+#View results
+#large so calling indp
+print("Semantic")
+switchpoint_results$model[[1]] %>% summary()
+print("phonological")
+switchpoint_results$model[[2]] %>% summary()
+print("Frequency")
+switchpoint_results$model[[3]] %>% summary()
+
 
 ```
 
@@ -485,6 +523,36 @@ wiac_cluster_plots <- map(plot_configs, ~ {
 wiac_cluster_plots[[1]] 
 wiac_cluster_plots[[2]] 
 wiac_cluster_plots[[3]]
+
+
+# Ordinal Plots
+plots_cluster_num <- cluster_results %>% 
+  mutate(
+    emmip_plot = map(model, ~ 
+      emmip(.x, Group ~ Cluster_Number,  
+            cov.reduce = range, CI = TRUE) +
+      labs(title = "Group", x = "Cluster Number", y = paste("Linear prediction", "(", unique(cue), ")")) +
+      theme_few() + 
+      theme(aspect.ratio = 1.5, legend.position = "top")))
+
+
+plots_cluster_num$emmip_plot[[1]]+plots_cluster_num$emmip_plot[[2]]+plots_cluster_num$emmip_plot[[3]]
+
+
+
+# Ordinal Plots
+plots_switch_num <- switchpoint_results %>% 
+  mutate(
+    emmip_plot = map(model, ~ 
+      emmip(.x, Group ~ Switch_Number,  
+            cov.reduce = range, CI = TRUE) +
+      labs(title = "Group", x = "Switch Number", y = paste("Linear prediction", "(", unique(cue), ")"))+
+      theme_few() + 
+      theme(aspect.ratio = 1.5, legend.position = "top")))
+
+
+plots_switch_num$emmip_plot[[1]]+plots_switch_num$emmip_plot[[2]]+plots_switch_num$emmip_plot[[3]]
+
 ```
 
 # Exploring Battery Measures for PWA
@@ -598,7 +666,7 @@ emm_results <- list(
 #PNT
 plot_pnt <- emmip(emm_results$TCorrPNT, ~ TCorrPNT, CIs = TRUE) +
   labs(title = "",
-       x = "TCorrPNT", 
+       x = "PNT Score (NCorr)", 
        y = "Estimated Fluency Score") +
   theme_few() +
   theme(aspect.ratio = 1.5, legend.position = "top")
@@ -608,7 +676,7 @@ plot_pnt
 #Form Errors (PNT)
 plot_TrueFor <- emmip(emm_results$TrueFor, ~ TrueFor, CIs = TRUE) +
   labs(title = "",
-       x = "TrueFor", 
+       x = "Form Errors in PNT", 
        y = "Estimated Fluency Score")  +
   theme_few() +
   theme(aspect.ratio = 1.5, legend.position = "top")
@@ -617,7 +685,7 @@ plot_TrueFor
 #Synonymy (syntot)
 plot_syntot <- emmip(emm_results$syntot., ~ syntot., CIs = TRUE) +
   labs(title = "",
-       x = "syntot", 
+       x = "syntot score", 
        y = "Estimated Fluency Score")  +
   theme_few() +
   theme(aspect.ratio = 1.5, legend.position = "top")
@@ -627,7 +695,7 @@ plot_syntot
 #Nonword repetition
 plot_nwr <- emmip(emm_results$nonwdrep.., ~ nonwdrep.., CIs = TRUE) +
   labs(title = "",
-       x = "Nonwdrep", 
+       x = "nonword repetition score", 
        y = "Estimated Fluency Score")  +
   theme_few() +
   theme(aspect.ratio = 1.5, legend.position = "top")
@@ -690,7 +758,6 @@ emm_results_switch <- list(
 )
 
 #plot sig predictors
-#PNT
 switch_syntot <- emmip(emm_results_switch$syntot., ~ syntot., CIs = TRUE) +
   labs(title = "",
        x = "syntot.", 
