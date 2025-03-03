@@ -431,7 +431,7 @@ print("Frequency")
 switch_results$model[[3]] %>% summary()
 
 #phonology
-emmeans(switch_results$model[[2]],pairwise~Group*domain*Switch,simple="Switch",pbkrtest.limit = 35657)
+emmeans(switch_results$model[[2]],pairwise~Group*Switch,simple="Switch",pbkrtest.limit = 35657)
 
 ```
 
@@ -489,23 +489,200 @@ wiac_cluster_plots[[3]]
 
 # Exploring Battery Measures
 ```{r}
-battery<-pwa_dx %>% rename("Subject"="Fluency.ID") %>%select(Subject,TCorrPNT,TrueSem,TrueFor,TrueMix,prt,syntot.,camcac.,catprl1)%>%mutate(Subject=as.factor(Subject))
+
+battery <- pwa_dx %>%
+  rename(Subject = Fluency.ID) %>%
+  select(Subject, TCorrPNT, TrueSem, TrueFor, prt, syntot., camcac., catprl1) %>%
+  mutate(
+    Subject = as.factor(Subject),
+    across(-Subject, as.numeric)  # Convert all other columns to numeric
+  ) %>%
+  na.omit()
+
 pwa_avg_length<-pwa_lengths %>%  group_by(Subject) %>%
   summarize(avg_length = mean(Phoneme.Count, na.rm = TRUE))
-                       
-#filter out controls and join battery data
-#NOTE many IDs have two entries
+
+#Battery descriptions & means from Mirman et al. (2015)
+
+#Philadelphia Naming Test (PNT)
+#A 175-item single-word picture naming test using drawings, target words cover a relatively wide range of word length, word
+#frequency, and semantic category. The pictures are all familiar objects with high name agreement (97%)
+#Overall percent correct (M=63.3, SD=29.1, Range=1.1–97.7)
+#Percent of semantic errors (M=5.4, SD=3.9, Range=1.1–18.3)
+#percent of phonological errors (M=13.2, SD=13.3, Range=0–49.1).
+
+#Philadelphia Repetition Test
+#A word repetition test using the same set of 175 targets as the Philadelphia Naming Test. 
+#Performance is measured by percent correct: M=85.9, SD=14.1, Range=39–100.
+
+#Camels and Cactus Test (camcac)
+#Test of non-verbal semantic processing in which a pictured item must be matched to the closest associate 
+#among a set of four pictured choices (e.g., wine matched to: grapes, cherry, strawberry,orange). 
+#Performance is measured by percent correct of 64 trials: M=75.2, SD=15.0, Range=25–95.
+
+#Synonymy triplets (syntot)
+#Test of verbal semantic processing in which participants must decide which two of three words are most similar in meaning. Half
+#the trials involve nouns (e.g., violin, fiddle, clarinet), the other half
+#verbs (e.g., to repair, to design, to fix). Performance is measured by percent correct of 30 trials: M=79.1, SD=16.9, Range=33–100.
+
+#Semantic category probe test
+#Test of semantic short-term memory in which participantslisten to a list of three or more words and must determine whether the final word is from the same category
+#as any of the preceding words by saying or pointing to “Yes” or “No”. The list of words gradually increases and performance is measured as the
+#maximum list length with 75% or higher accuracy: M=2.18, SD=1.28, Range=0.50–6.00.
+
+#set up dfs
+#NOTE many IDs have two entries 
 
 #Lexical df
 lexical_battery<-all_indv %>% select(Subject, Group, Semantic_Similarity_mean, Phonological_Similarity_mean, Frequency_Value_mean, 
-         fluency_score) %>% na.omit() %>%filter(Group=="PWA") %>%left_join(battery,by="Subject") %>%left_join(pwa_avg_length,by="Subject")
+         fluency_score) %>% na.omit() %>%filter(Group=="PWA") %>%left_join(battery,by="Subject") %>%left_join(pwa_avg_length,by="Subject") %>% na.omit() %>%
+  rename("semantic" = "Semantic_Similarity_mean", 
+         "phonological" = "Phonological_Similarity_mean",
+         "frequency" = "Frequency_Value_mean")%>%
+  pivot_longer(names_to = "cue", cols=c(semantic,phonological,frequency)) 
+
+
 
 #Clustering df
 clusters_battery<-best_clusters %>%filter(Group=="PWA") %>%left_join(battery,by="Subject")
 
-#Add analyses here
+```
+## Lexical Analyses
+```{r}
+
+fluency_battery_lm = lm(data = lexical_battery, fluency_score ~ TCorrPNT+TrueSem+TrueFor+prt+syntot.+camcac.+catprl1)
+summary(fluency_battery_lm)
+car::Anova(fluency_battery_lm)
+
+
+#Does semantic similarity, phonological similarity, and frequency differ across measures
+# Run lm() for each cue and extract results
+lexical_battery_results <- lexical_battery  %>%
+  group_by(cue) %>%                                   # Group by cue
+  nest() %>%                                         # Nest data by cue
+ mutate(
+    model = map(data, ~ lm(value ~ TCorrPNT+TrueSem+TrueFor+prt+syntot.+camcac.+catprl1, data = .)) # Fit models
+  )
+#View results
+model_battery_summaries <- lexical_battery_results %>%
+  mutate(model_summary = map(model, broom::tidy)) %>%
+  unnest(model_summary)
+View(model_battery_summaries)
+```
+
+### Fluency Plots
+
+```{r}
+emm_results <- list(
+  TCorrPNT = emmeans(fluency_battery_lm, ~ TCorrPNT, cov.reduce = range),
+  TrueSem  = emmeans(fluency_battery_lm, ~ TrueSem, cov.reduce = range),
+  TrueFor  = emmeans(fluency_battery_lm, ~ TrueFor, cov.reduce = range),
+  prt      = emmeans(fluency_battery_lm, ~ prt, cov.reduce = range),
+  syntot.  = emmeans(fluency_battery_lm, ~ syntot., cov.reduce = range),
+  camcac.  = emmeans(fluency_battery_lm, ~ camcac., cov.reduce = range),
+  catprl1  = emmeans(fluency_battery_lm, ~ catprl1, cov.reduce = range)
+)
+
+#plot sig predictors
+#PNT
+plot_pnt <- emmip(emm_results$TCorrPNT, ~ TCorrPNT, CIs = TRUE) +
+  labs(title = "PNT by Fluency Score",
+       x = "TCorrPNT", 
+       y = "Estimated Fluency Score") +
+  theme_few() +
+  theme(aspect.ratio = 1.5, legend.position = "top")
+plot_pnt
+
+#Form Errors (PNT)
+plot_TrueFor <- emmip(emm_results$TrueFor, ~ TrueFor, CIs = TRUE) +
+  labs(title = "Form Errors by Fluency Score",
+       x = "TrueFor", 
+       y = "Estimated Fluency Score")  +
+  theme_few() +
+  theme(aspect.ratio = 1.5, legend.position = "top")
+plot_TrueFor
+
+#Synonymy (syntot)
+plot_syntot <- emmip(emm_results$syntot., ~ syntot., CIs = TRUE) +
+  labs(title = "Synonymy Judgments by Fluency Score",
+       x = "syntot", 
+       y = "Estimated Fluency Score")  +
+  theme_few() +
+  theme(aspect.ratio = 1.5, legend.position = "top")
+plot_syntot
+
+
+#the better the performance on the PNT & syntot, the higher the fluency score
+#But those with higher frequency scores also produced more form errors
+```
+### Lexical plots
+
+```{r}
+
+#just significant predictors
+predictors <- c( "syntot.", "camcac.")
+
+plots_lexical <- lexical_battery_results %>% filter(cue=="phonological")%>%
+  mutate(
+    emmip_plot = map2(model, cue, ~ {
+      predictor_plots <- map(predictors, function(pred) {
+        emm <- emmeans(.x, as.formula(paste("~", pred)), cov.reduce = range)
+        emmip(emm, as.formula(paste("~", pred)), CIs = TRUE) +
+          labs(title = paste("",  ""),
+               x = pred, 
+               y = "Estimated Phonological Similarity")  +
+          theme_few() +
+          theme(aspect.ratio = 1.5, legend.position = "top")
+      })
+      patchwork::wrap_plots(predictor_plots)  # Combine
+    })
+  )
+
+plots_lexical$emmip_plot[[1]]
+
+#for verbal semantic processing tasks (syntot), high performance assc with lower inter-item phonological similarity (less interference/more control over semantic processing)
+#for NON verbal (camcac), high score assc with high avg inyter-item phonological similarity
+```
+## Cluster Analyses
+```{r}
+#When using the best method, does avg cluster mean differ by battery measures
+cluster_battery_lm = lm(data = clusters_battery, Cluster_Size_mean ~ TCorrPNT+TrueSem+TrueFor+prt+syntot.+camcac.+catprl1)
+summary(cluster_battery_lm)
+car::Anova(cluster_battery_lm)
+#all ns
+
+switch_battery_lm = lm(data = clusters_battery, Number_of_Switches ~ TCorrPNT+TrueSem+TrueFor+prt+syntot.+camcac.+catprl1)
+summary(switch_battery_lm)
+car::Anova(switch_battery_lm)
+#marginal sig predictor of syntot
+
+#better syntot performance assc with more switches
+
+```
+
+
+### Cluster Plots
+
+```{r}
+emm_results_switch <- list(
+  syntot. = emmeans(switch_battery_lm, ~ syntot., cov.reduce = range)
+)
+
+#plot sig predictors
+#PNT
+switch_syntot <- emmip(emm_results_switch$syntot., ~ syntot., CIs = TRUE) +
+  labs(title = "",
+       x = "syntot.", 
+       y = "Number of Switches") +
+  theme_few() +
+  theme(aspect.ratio = 1.5, legend.position = "top")
+switch_syntot
 ```
 
 
 
+
+
+
+```{r}
 ```{r}
