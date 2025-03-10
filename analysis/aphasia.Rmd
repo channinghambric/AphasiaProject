@@ -248,7 +248,7 @@ bic <- full_model_data_parameters %>%
   left_join(random_nLL_lookup, by = c("Subject","Group")) %>%  
   left_join(parameters, by="parameter_link") %>%
   mutate(
-    optimalBIC = k * log(N) - 2 * Negative_Log_Likelihood_Optimized,
+    optimalBIC = k * log(N) - 2 * (-Negative_Log_Likelihood_Optimized),
     randomBIC = random_k * log(N) - 2 * (-random_nLLs))
 
 
@@ -269,7 +269,7 @@ median_delta_bic = bic %>%
   mutate(deltaBIC  = randomBIC - optimalBIC) %>%
   group_by(Group,everything) %>%
   summarise(medianBIC = median(deltaBIC)) %>%
-  arrange(medianBIC) %>%
+  arrange(desc(medianBIC)) %>%
   slice(1) %>% 
   ungroup() 
 kable(median_delta_bic)
