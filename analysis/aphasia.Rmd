@@ -698,7 +698,7 @@ plots_switch_num$emmip_plot[[1]]+plots_switch_num$emmip_plot[[2]]+plots_switch_n
 #Pre-recorded nonword targets derived from PNT,  target words were presented to participants for repetition. 
 #Performance is measured by percent correct of 60 trials: M=47.3, SD=25.8, Range=0–98.
 
-
+#set up dfs
 
 battery <- pwa_dx %>%
   rename(Subject = Fluency.ID) %>% filter(Subject %in% all_indv$Subject)%>%
@@ -709,21 +709,20 @@ battery <- pwa_dx %>%
   ) %>%
   na.omit()
 
+#NOTE 8 IDs have two entries - dropping these  
+participant_drop_list <- battery %>%
+  count(Subject) %>%  
+  filter(n > 1) %>%  
+  select(Subject)
+
 #creating composite measures
-battery<-battery %>%mutate(semantic_output=TrueSem+TrueMix, phon_output=TrueNonW+TrueFor)
+battery<-battery %>%mutate(semantic_output=TrueSem+TrueMix, phon_output=TrueNonW+TrueFor) %>%filter(!Subject %in% participant_drop_list$Subject)
 write.csv(battery,"battery.csv")
 
 
 #LOOKING AT CORRELATIONS
 library(corrplot)
 corrplot(cor(battery%>%select(-Subject,-TrueSem,-TrueMix,-TrueFor,-TrueNonW)))
-
-#set up dfs
-#NOTE 8 IDs have two entries - dropping these  
-participant_drop_list <- lexical_battery_wide %>%
-  count(Subject) %>%  
-  filter(n > 1) %>%  
-  select(Subject)
 
 #getting word lengths
 pwa_avg_length<-pwa_lengths %>%  group_by(Subject) %>%
