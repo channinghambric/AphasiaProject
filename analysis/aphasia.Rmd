@@ -18,13 +18,10 @@ library(ggplot2)
 library(ggthemes)
 library(tidyboot)
 library(paletteer)
-library(ggbeeswarm)
 library(lme4)
 library(emmeans)
 library(knitr)
-library(ggridges)
 library(patchwork)
-library(uuid)
 library(data.table)
 
 ```
@@ -168,7 +165,7 @@ lexical_results <- lexical_analysis_data  %>%
   group_by(cue) %>%                                   # Group by cue
   nest() %>%                                         # Nest data by cue
  mutate(
-    model = map(data, ~ lm(value ~ Group * fluency_score+avg_length, data = .)) # Fit models
+    model = map(data, ~ lm(value ~ Group*fluency_score+avg_length, data = .)) # Fit models
   )
 #View results
 model_summaries <- lexical_results %>%
@@ -182,19 +179,26 @@ View(model_summaries)
 
 ### Lexical Plots
 ```{r}
+
+#fluency density plot
 fluency_plot <- lexical_analysis_data %>%
-  ggplot(aes(x = Group, y = fluency_score, fill = Group)) +
-  geom_boxplot(color = "black") +
-  ylim(0, 50) +  
-  labs(y = 'Fluency score', x = "Group", title = "") +
+  ggplot(aes(x = fluency_score, fill = Group, color = Group)) +
+  geom_density(alpha = 0.8) +  # Adjust transparency for overlapping densities
+  xlim(0, 50) +  
+  labs(y = 'Density', x = "Fluency Score", title = "") +
   theme_few() +
   theme(
-    aspect.ratio = 1, axis.text.y = element_text(size = 14),axis.text.x = element_text(size = 14),
+    aspect.ratio = 1, 
+    axis.text.y = element_text(size = 14),
+    axis.text.x = element_text(size = 14),
     legend.position = 'right',
     plot.title = element_text(size = 18)  
   ) +
-  scale_fill_paletteer_d("lisa::SandroBotticelli") 
+  scale_fill_paletteer_d("lisa::SandroBotticelli") +
+  scale_color_paletteer_d("lisa::SandroBotticelli")  # Match fill and line colors
 
+
+#word length plot
 length_plot <- lexical_analysis_data %>%
   ggplot(aes(x = Group, y = avg_length, fill = Group)) +
   geom_boxplot(color = "black") +
@@ -209,7 +213,34 @@ length_plot <- lexical_analysis_data %>%
   scale_fill_paletteer_d("lisa::SandroBotticelli") 
 fluency_plot+length_plot
 
+#raw values
+cue_labels <- c(
+  `Semantic\nSimilarity` = "Semantic Similarity",
+  `Phonological\nSimilarity` = "Phonological Similarity",
+  `Word\nFrequency` = "Word Frequency"
+)
 
+lexical_raw_plot <- lexical_analysis_data %>%
+  group_by(Group, cue) %>%
+  tidyboot_mean(value, nboot = 100, na.rm = TRUE) %>%
+  mutate(cue = fct_recode(cue, 
+                      `Semantic\nSimilarity` = "semantic", 
+                      `Phonological\nSimilarity` = "phonological",
+                      `Word\nFrequency` = "frequency"),
+         cue = factor(cue, levels = c("Semantic\nSimilarity", 
+                                      "Phonological\nSimilarity", 
+                                      "Word\nFrequency"))) %>%  # 
+  ggplot(aes(x = Group, y = empirical_stat, group = Group, fill = Group)) + 
+  facet_wrap(~cue, scales = "free_y", labeller = as_labeller(cue_labels)) + 
+  geom_col() +
+  geom_errorbar(aes(ymin = ci_lower, ymax = ci_upper), width = 0.1) +
+  labs(y = NULL, x = "Group") +  
+  theme_few() +
+  scale_fill_paletteer_d("lisa::SandroBotticelli")  
+
+lexical_raw_plot
+
+#model predicted
 plots_lexical <- lexical_results %>% 
   mutate(
     emmip_plot = map(model, ~ 
@@ -227,6 +258,9 @@ plots_lexical$emmip_plot[[1]]+plots_lexical$emmip_plot[[2]]+plots_lexical$emmip_
 
 # Best Models
 ```{r}
+
+#FOR OVERALL GROUP
+
 #Getting N
 just_fluency<-all_indv %>%select(Subject,Group,fluency_score) %>%rename("N"="fluency_score") %>%na.omit() %>%unique()
 # Extract random model's nLL for each Subject x Group
@@ -260,8 +294,7 @@ lowest_bic = bic %>%
 #Looking at distribution
 lowest_bic %>%
   ggplot(aes(x = optimalBIC, fill = Group)) + facet_wrap(~Group)+
-  geom_density(fill = "#69b3a2", color = "#e9ecef", alpha = 0.8) +
-  xlim(-600, 0)
+  geom_density(fill = "#69b3a2", color = "#e9ecef", alpha = 0.8)
 
 
 #median delta BIC
@@ -275,11 +308,43 @@ median_delta_bic = bic %>%
 kable(median_delta_bic)
 
 
+#BY PARTICIPANT BEST MODELS 
+subject_median_delta_bic = bic %>% 
+  mutate(deltaBIC  = randomBIC - optimalBIC) %>%
+  group_by(Subject,everything) %>%
+  summarise(medianBIC = median(deltaBIC)) %>%
+  arrange(desc(medianBIC)) %>%
+  slice(1) %>% 
+  ungroup() 
+
+
+```
+
+### Best model distribution
+```{r}
+  
+best_models_p%>%
+    group_by(Group,model_type) %>%
+    count() %>%
+    ggplot(aes(x = Group, y = n, group = model_type, fill = model_type)) +
+    geom_col() +
+    labs(y = "number of participants", x = "", fill = "best model type") +  
+    theme_few() +
+    scale_fill_calc() +
+    theme(
+    aspect.ratio = 1, 
+    legend.position = 'right',  # Position legend at the top
+    axis.text.x = element_text(angle = 45, hjust = 1, face = "bold")) +
+  scale_fill_paletteer_d("rcartocolor::Antique")
+
+
 ```
 
 
 # Beta Analyses
 ```{r}
+
+#BY GROUP
 #Filtering full data to only include best model for each domain type
 best_models <- all_models %>%
   filter(paste(Group,everything) %in% paste(median_delta_bic$Group, median_delta_bic$everything)) %>%
@@ -305,10 +370,35 @@ beta_summaries <- beta_results %>%
 View(beta_summaries)
 
 
+#By PARTICIPANT BEST MODELS
+best_models_p <- all_models %>%
+  filter(paste(Subject,everything) %in% paste(subject_median_delta_bic$Subject, subject_median_delta_bic$everything))
+
+#Separating out betas
+beta_values_p  = best_models_p  %>%
+  pivot_longer(names_to = "beta", cols = c(Beta_Frequency, Beta_Phonological, Beta_Semantic))
+
+# Run lm() for each beta type and extract results
+beta_results_p <- beta_values_p  %>%
+  group_by(beta) %>%                                   
+  nest() %>%                                         
+ mutate(
+    model = map(data, ~ lm(value ~ Group, data = .)) 
+  )
+
+#View results
+beta_summaries_p <- beta_results_p %>%
+  mutate(model_summary = map(model, broom::tidy)) %>%
+  unnest(model_summary)
+View(beta_summaries_p)
+
 ```
+
 
 ### Beta plot
 ```{r}
+
+#BY GROUP BEST MODEL
 beta_values %>%
   group_by(Group,beta) %>%
   tidyboot_mean(value, nboot = 1000, na.rm = TRUE) %>%
@@ -328,13 +418,21 @@ beta_values %>%
   theme_few() +
   theme() +
   scale_fill_paletteer_d("lisa::SandroBotticelli")
+
 ```
 
 # Clustering Analyses
 ```{r}
+
+#BY GROUP
 #filtering to only include best method from above
 best_clusters <- all_indv%>%
   filter(paste(Group, full_method) %in% paste(best_models$Group, best_models$full_method)) %>%select(-fluency_score)%>% #this is full of NAs & produces mismatch .x/.y error, so dropping
+  group_by(Group) %>%left_join(lexical_analysis_data%>%select(Subject,Group,fluency_score)%>%unique(), by = c("Subject", "Group")) #adding fluency_score back in
+
+#Participant best models
+best_clusters_p <- all_indv%>%
+  filter(paste(Subject, full_method) %in% paste(best_models_p$Subject, best_models_p$full_method)) %>%select(-fluency_score)%>% #this is full of NAs & produces mismatch .x/.y error, so dropping
   group_by(Group) %>%left_join(lexical_analysis_data%>%select(Subject,Group,fluency_score)%>%unique(), by = c("Subject", "Group")) #adding fluency_score back in
 
 #When using the best method for each Group, does avg cluster mean differ by Group x domain
@@ -347,6 +445,17 @@ car::Anova(cluster_size_lm)
 switch_numb_lm = lm(data = best_clusters, Number_of_Switches ~Group + fluency_score)
 summary(switch_numb_lm)
 car::Anova(switch_numb_lm)
+
+
+#Replicating prev analyses where they don't include fluency score as covariate
+cluster_size_lm_no_fs = lm(data = best_clusters, Cluster_Size_mean ~ Group)
+summary(cluster_size_lm_no_fs)
+car::Anova(cluster_size_lm_no_fs)
+
+#When using the best method for each Group, does avg numb switches differ by Group x domain
+switch_numb_lm_no_fs = lm(data = best_clusters, Number_of_Switches ~Group)
+summary(switch_numb_lm_no_fs)
+car::Anova(switch_numb_lm_no_fs)
 
 ```
 
@@ -374,6 +483,7 @@ clusters+switches+ plot_layout(ncol = 1)
 
 # Within Cluster vs Switch Trial Lexical Metrics
 ```{r}
+#By participant best models
 #filtering to only include best method for each domain
 best_switches <- all_switches %>% 
   filter(paste(Group,full_method) %in% paste(best_models$Group, best_models$full_method)) %>%
@@ -409,6 +519,8 @@ switches_recoded <- best_switches %>%
     "frequency" = "Frequency_Value"
   ) %>% filter(row_id!=0)%>% #dropping first word of each list
   pivot_longer(names_to = "cue", cols = c(semantic, phonological, frequency))
+
+write.csv(switches_recoded,"switches.csv")
                                                                                        
                                                                                        
 ## does cluster/switch designation predict semantic similarity, phonological similarity, and frequency for each Group 
@@ -520,8 +632,8 @@ wiac_cluster_plots <- map(plot_configs, ~ {
    scale_fill_manual(values = c("darkorange4", "coral3"))
 })
 
-wiac_cluster_plots[[1]] 
-wiac_cluster_plots[[2]] 
+wiac_cluster_plots[[1]]+
+wiac_cluster_plots[[2]]+ 
 wiac_cluster_plots[[3]]
 
 
@@ -558,18 +670,6 @@ plots_switch_num$emmip_plot[[1]]+plots_switch_num$emmip_plot[[2]]+plots_switch_n
 # Exploring Battery Measures for PWA
 ```{r}
 
-battery <- pwa_dx %>%
-  rename(Subject = Fluency.ID) %>%
-  select(Subject, TCorrPNT, TrueSem, TrueFor, prt, syntot., camcac., catprl1,nonwdrep..,rhyprl1) %>%
-  mutate(
-    Subject = as.factor(Subject),
-    across(-Subject, as.numeric)  # Convert all other columns to numeric
-  ) %>%
-  na.omit()
-
-pwa_avg_length<-pwa_lengths %>%  group_by(Subject) %>%
-  summarize(avg_length = mean(Phoneme.Count, na.rm = TRUE))
-
 #Battery descriptions & means from Mirman et al. (2015)
 
 #Philadelphia Naming Test (PNT)
@@ -593,22 +693,50 @@ pwa_avg_length<-pwa_lengths %>%  group_by(Subject) %>%
 #the trials involve nouns (e.g., violin, fiddle, clarinet), the other half
 #verbs (e.g., to repair, to design, to fix). Performance is measured by percent correct of 30 trials: M=79.1, SD=16.9, Range=33–100.
 
-#Semantic category probe test (catprl1)
-#Test of semantic short-term memory in which participantslisten to a list of three or more words and must determine whether the final word is from the same category
-#as any of the preceding words by saying or pointing to “Yes” or “No”. The list of words gradually increases and performance is measured as the
-#maximum list length with 75% or higher accuracy: M=2.18, SD=1.28, Range=0.50–6.00.
-
-#Rhyme Probe Test (rhyprl1)
-#Test of phonological short-term memory in which participants listen to a list of three or more words and must determine whether the final word rhymes with any of the preceding words by
-#saying or pointing to “Yes” or “No”. The list of words gradually increases and performance is measured as the maximum list length with 75% or 
-#higher accuracy: M=2.80, SD=1.69,Range=.50–7.31.
 
 #Nonword Repetition Test (nonwdrep..)
 #Pre-recorded nonword targets derived from PNT,  target words were presented to participants for repetition. 
 #Performance is measured by percent correct of 60 trials: M=47.3, SD=25.8, Range=0–98.
 
+
+
+battery <- pwa_dx %>%
+  rename(Subject = Fluency.ID) %>% filter(Subject %in% all_indv$Subject)%>%
+  select(Subject, TCorrPNT, TrueSem, TrueFor, TrueMix, TrueNonW, prt, syntot., camcac.,nonwdrep..) %>%
+  mutate(
+    Subject = as.factor(Subject),
+    across(-Subject, ~ as.numeric(as.character(.))) 
+  ) %>%
+  na.omit()
+
+#creating composite measures
+battery<-battery %>%mutate(semantic_output=TrueSem+TrueMix, phon_output=TrueNonW+TrueFor)
+write.csv(battery,"battery.csv")
+
+
+#LOOKING AT CORRELATIONS
+library(corrplot)
+corrplot(cor(battery%>%select(-Subject,-TrueSem,-TrueMix,-TrueFor,-TrueNonW)))
+
 #set up dfs
-#NOTE many IDs have two entries 
+#NOTE 8 IDs have two entries - dropping these  
+participant_drop_list <- lexical_battery_wide %>%
+  count(Subject) %>%  
+  filter(n > 1) %>%  
+  select(Subject)
+
+#getting word lengths
+pwa_avg_length<-pwa_lengths %>%  group_by(Subject) %>%
+  summarize(avg_length = mean(Phoneme.Count, na.rm = TRUE))
+
+
+lexical_battery_wide<-all_indv %>% select(Subject, Group, Semantic_Similarity_mean, Phonological_Similarity_mean, Frequency_Value_mean, 
+         fluency_score) %>% na.omit() %>%filter(Group=="PWA") %>%left_join(battery,by="Subject")  %>% na.omit() %>%
+  rename("semantic" = "Semantic_Similarity_mean", 
+         "phonological" = "Phonological_Similarity_mean",
+         "frequency" = "Frequency_Value_mean") %>% unique()%>%filter(!Subject %in% participant_drop_list$Subject)
+write.csv(lexical_battery_wide,"lexical_metrics_battery.csv") # save wide version to csv
+
 
 #Lexical df
 lexical_battery<-all_indv %>% select(Subject, Group, Semantic_Similarity_mean, Phonological_Similarity_mean, Frequency_Value_mean, 
@@ -616,18 +744,21 @@ lexical_battery<-all_indv %>% select(Subject, Group, Semantic_Similarity_mean, P
   rename("semantic" = "Semantic_Similarity_mean", 
          "phonological" = "Phonological_Similarity_mean",
          "frequency" = "Frequency_Value_mean")%>%
-  pivot_longer(names_to = "cue", cols=c(semantic,phonological,frequency)) 
+  pivot_longer(names_to = "cue", cols=c(semantic,phonological,frequency)) %>%filter(!Subject %in% participant_drop_list$Subject)
 
 
 
 #Clustering df
-clusters_battery<-best_clusters %>%filter(Group=="PWA") %>%left_join(battery,by="Subject")
+##Note this is using participant best model
+clusters_battery<-best_clusters_p %>%filter(Group=="PWA") %>%left_join(battery,by="Subject")%>%filter(!Subject %in% participant_drop_list$Subject)
+write.csv(clusters_battery,"clustering_metrics_battery.csv") # save to csv
+
 
 ```
 ## Lexical Analyses
 ```{r}
 
-fluency_battery_lm = lm(data = lexical_battery, fluency_score ~ TCorrPNT+TrueSem+TrueFor+prt+syntot.+camcac.+catprl1+nonwdrep..+rhyprl1+avg_length)
+fluency_battery_lm = lm(data = lexical_battery, fluency_score ~ TCorrPNT+semantic_output+phon_output+prt+syntot.+camcac.+nonwdrep..+avg_length)
 summary(fluency_battery_lm)
 car::Anova(fluency_battery_lm)
 
@@ -638,7 +769,7 @@ lexical_battery_results <- lexical_battery  %>%
   group_by(cue) %>%                                   # Group by cue
   nest() %>%                                         # Nest data by cue
  mutate(
-    model = map(data, ~ lm(value ~ TCorrPNT+TrueSem+TrueFor+prt+syntot.+camcac.+catprl1+nonwdrep..+rhyprl1+avg_length, data = .)) # Fit models
+    model = map(data, ~ lm(value ~ TCorrPNT+semantic_output+phon_output+prt+syntot.+camcac.+nonwdrep..+avg_length, data = .)) # Fit models
   )
 #View results
 model_battery_summaries <- lexical_battery_results %>%
@@ -652,12 +783,11 @@ View(model_battery_summaries)
 ```{r}
 emm_results <- list(
   TCorrPNT = emmeans(fluency_battery_lm, ~ TCorrPNT, cov.reduce = range),
-  TrueSem  = emmeans(fluency_battery_lm, ~ TrueSem, cov.reduce = range),
-  TrueFor  = emmeans(fluency_battery_lm, ~ TrueFor, cov.reduce = range),
+  semantic_output  = emmeans(fluency_battery_lm, ~ semantic_output, cov.reduce = range),
+  phon_output  = emmeans(fluency_battery_lm, ~ phon_output, cov.reduce = range),
   prt      = emmeans(fluency_battery_lm, ~ prt, cov.reduce = range),
   syntot.  = emmeans(fluency_battery_lm, ~ syntot., cov.reduce = range),
   camcac.  = emmeans(fluency_battery_lm, ~ camcac., cov.reduce = range),
-  catprl1  = emmeans(fluency_battery_lm, ~ catprl1, cov.reduce = range),
   nonwdrep..  = emmeans(fluency_battery_lm, ~ nonwdrep.., cov.reduce = range)
 
 )
@@ -672,15 +802,23 @@ plot_pnt <- emmip(emm_results$TCorrPNT, ~ TCorrPNT, CIs = TRUE) +
   theme(aspect.ratio = 1.5, legend.position = "top")
 plot_pnt
 
-
-#Form Errors (PNT)
-plot_TrueFor <- emmip(emm_results$TrueFor, ~ TrueFor, CIs = TRUE) +
+#Sem Errors (PNT)
+plot_sem <- emmip(emm_results$semantic_output, ~ semantic_output, CIs = TRUE) +
   labs(title = "",
-       x = "Form Errors in PNT", 
+       x = "Semantic Output Errors in PNT", 
        y = "Estimated Fluency Score")  +
   theme_few() +
   theme(aspect.ratio = 1.5, legend.position = "top")
-plot_TrueFor
+plot_sem
+
+#Phon Errors (PNT)
+plot_phon <- emmip(emm_results$phon_output, ~ phon_output, CIs = TRUE) +
+  labs(title = "",
+       x = "Phon Output Errors in PNT", 
+       y = "Estimated Fluency Score")  +
+  theme_few() +
+  theme(aspect.ratio = 1.5, legend.position = "top")
+plot_phon
 
 #Synonymy (syntot)
 plot_syntot <- emmip(emm_results$syntot., ~ syntot., CIs = TRUE) +
@@ -709,12 +847,12 @@ plot_nwr
 ```{r}
 
 #just significant effects/predictors
-predictors <- c( "syntot.", "camcac.")
+predictors_phon <- c( "syntot.", "camcac.")
 
-plots_lexical <- lexical_battery_results %>% filter(cue=="phonological")%>%
+plots_lexical_phon <- lexical_battery_results %>% filter(cue=="phonological")%>%
   mutate(
     emmip_plot = map2(model, cue, ~ {
-      predictor_plots <- map(predictors, function(pred) {
+      predictor_plots <- map(predictors_phon, function(pred) {
         emm <- emmeans(.x, as.formula(paste("~", pred)), cov.reduce = range)
         emmip(emm, as.formula(paste("~", pred)), CIs = TRUE) +
           labs(title = paste("",  ""),
@@ -727,25 +865,47 @@ plots_lexical <- lexical_battery_results %>% filter(cue=="phonological")%>%
     })
   )
 
-plots_lexical$emmip_plot[[1]]
+plots_lexical_phon$emmip_plot[[1]]
 
 #for verbal semantic processing/comprehension tasks (syntot), high performance assc with lower inter-item phonological similarity in SFT  (less interference/more control over semantic processing)
 #for NON verbal semantic association/processing tasks (camcac), high score assc with high avg inter-item phonological similarity in SFT
+
+
+predictors_freq <- c( "TCorrPNT", "phon_output","avg_length")
+
+plots_lexical_freq <- lexical_battery_results %>% filter(cue=="frequency")%>%
+  mutate(
+    emmip_plot = map2(model, cue, ~ {
+      predictor_plots <- map(predictors_freq, function(pred) {
+        emm <- emmeans(.x, as.formula(paste("~", pred)), cov.reduce = range)
+        emmip(emm, as.formula(paste("~", pred)), CIs = TRUE) +
+          labs(title = paste("",  ""),
+               x = pred, 
+               y = "Estimated Avg Word Frequency")  +
+          theme_few() +
+          theme(aspect.ratio = 1.5, legend.position = "top")
+      })
+      patchwork::wrap_plots(predictor_plots)  # Combine
+    })
+  )
+
+plots_lexical_freq$emmip_plot[[1]]
+
 ```
 ## Cluster Analyses
 ```{r}
 #When using the best method, does avg cluster mean differ by battery measures
-cluster_battery_lm = lm(data = clusters_battery, Cluster_Size_mean ~ TCorrPNT+TrueSem+TrueFor+prt+syntot.+camcac.+catprl1)
+cluster_battery_lm = lm(data = clusters_battery, Cluster_Size_mean ~ TCorrPNT+semantic_output+phon_output+prt+syntot.+camcac.)
 summary(cluster_battery_lm)
 car::Anova(cluster_battery_lm)
 #all ns
 
-switch_battery_lm = lm(data = clusters_battery, Number_of_Switches ~ TCorrPNT+TrueSem+TrueFor+prt+syntot.+camcac.+catprl1)
+switch_battery_lm = lm(data = clusters_battery, Number_of_Switches ~ TCorrPNT+semantic_output+phon_output+prt+syntot.+camcac.)
 summary(switch_battery_lm)
 car::Anova(switch_battery_lm)
-#marginal sig predictor of syntot
+# sig predictor of syntot
 
-#better syntot performance assc with more switches
+#All ns
 
 ```
 
