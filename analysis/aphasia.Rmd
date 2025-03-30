@@ -709,14 +709,14 @@ battery <- pwa_dx %>%
   ) %>%
   na.omit()
 
-#NOTE 8 IDs have two entries - dropping these  
+#NOTE 9 IDs have two entries - dropping these  
 participant_drop_list <- battery %>%
   count(Subject) %>%  
   filter(n > 1) %>%  
   select(Subject)
 
 #creating composite measures
-battery<-battery %>%mutate(semantic_output=TrueSem+TrueMix, phon_output=TrueNonW+TrueFor) %>%filter(!Subject %in% participant_drop_list$Subject)
+battery<-battery %>%mutate(semantic_output=TrueSem+TrueMix, phon_output=TrueNonW+TrueFor) %>%filter(!Subject %in% participant_drop_list$Subject) #drop duplicates
 write.csv(battery,"battery.csv")
 
 
