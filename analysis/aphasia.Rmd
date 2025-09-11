@@ -9,7 +9,8 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# Libraries
+# SET UP
+## Libraries
 ```{r cars}
 library(tidyverse)
 library(purrr)
@@ -23,10 +24,11 @@ library(emmeans)
 library(knitr)
 library(patchwork)
 library(data.table)
+library(ggpattern)
 
 ```
 
-# Import Raw Data
+## Import Raw Data
 ```{r}
 control_fluency<-read.csv("../excel_data/Controls_Fluency.csv")
 pwa_fluency<-read.csv("../excel_data/PWA_Fluency.csv")
@@ -84,7 +86,8 @@ pwa_fluency_dist
 #write.csv(pwa_fluency_cutoff,"pwa_fluency_cleaned.csv")
 #write.csv(control_fluency,"control_fluency_cleaned.csv")
 ```
-# Import Forager Output
+
+## Import Forager Output
 ```{r}
 #Lexical data
 control_lex_results <- read_csv(unz("../forager/output/control/animals_forager_results.zip","lexical_results.csv")) %>% mutate(Group = "Control")
@@ -135,10 +138,12 @@ pwa_switch_results=read_csv(unz("../forager/output/pwa/animals_forager_results.z
 all_switches = rbind(control_switch_results,pwa_switch_results)%>% separate(Switch_Method, into = c("method", "param1", "param2", "param3"), sep = "_", fill = "right")%>%mutate(full_method=paste(method,param1,param2,param3,sep="_")) 
 
 ```
+############################################################################
 
-# Lexical Analyses 
+# LEXICAL ANALYSES
 ```{r}
 #import words lengths
+#to get word lengths, cleaned fluency lists were run through word_length.py
 control_lengths<-read.csv("control_wordlength.csv") %>%rename("Subject"="ID") %>%mutate(Group="Control")
 pwa_lengths<-read.csv("pwa_wordlength.csv")%>%rename("Subject"="ID")%>%mutate(Group="PWA")%>%mutate(Subject=as.factor(Subject))
 comb_wordlength <- rbind(control_lengths, pwa_lengths) %>%
@@ -177,25 +182,28 @@ View(model_summaries)
 
 ```
 
-### Lexical Plots
+## Lexical Plots
 ```{r}
 
 #fluency density plot
 fluency_plot <- lexical_analysis_data %>%
-  ggplot(aes(x = fluency_score, fill = Group, color = Group)) +
-  geom_density(alpha = 0.8) +  # Adjust transparency for overlapping densities
-  xlim(0, 50) +  
-  labs(y = 'Density', x = "Fluency Score", title = "") +
+  ggplot(aes(x = Group, 
+             y = fluency_score, 
+             fill = Group, 
+             color = Group)) +
+  geom_violin(trim = FALSE, alpha = 0.95,color="black") +
+  ylim(0, 50) +  
+  labs(y = "Fluency Score", x = "", title = "") +
   theme_few() +
   theme(
     aspect.ratio = 1, 
-    axis.text.y = element_text(size = 14),
-    axis.text.x = element_text(size = 14),
-    legend.position = 'right',
+    axis.text.y = element_text(size = 12),
+    axis.text.x = element_text(size = 12),
+    legend.position = "none",   # redundant with x-axis
     plot.title = element_text(size = 18)  
   ) +
-  scale_fill_paletteer_d("lisa::SandroBotticelli") +
-  scale_color_paletteer_d("lisa::SandroBotticelli")  # Match fill and line colors
+  scale_fill_paletteer_d("MoMAColors::Koons") +
+  scale_color_paletteer_d("MoMAColors::Koons")
 
 
 #word length plot
@@ -206,11 +214,11 @@ length_plot <- lexical_analysis_data %>%
   labs(y = 'Average Word Length (# of Phonemes)', x = "Group", title = "") +
   theme_few() +
   theme(
-    aspect.ratio = 1, axis.text.y = element_text(size = 14),axis.text.x = element_text(size = 14),
+    aspect.ratio = 1, axis.text.y = element_text(size = 12),axis.text.x = element_text(size = 12),
     legend.position = 'right',
     plot.title = element_text(size = 18)  
   ) +
-  scale_fill_paletteer_d("lisa::SandroBotticelli") 
+  scale_fill_paletteer_d("MoMAColors::Koons") 
 fluency_plot+length_plot
 
 #raw values
@@ -236,7 +244,7 @@ lexical_raw_plot <- lexical_analysis_data %>%
   geom_errorbar(aes(ymin = ci_lower, ymax = ci_upper), width = 0.1) +
   labs(y = NULL, x = "Group") +  
   theme_few() +
-  scale_fill_paletteer_d("lisa::SandroBotticelli")  
+  scale_fill_paletteer_d("MoMAColors::Koons")  
 
 lexical_raw_plot
 
@@ -247,18 +255,35 @@ plots_lexical <- lexical_results %>%
       emmip(.x, Group ~ fluency_score,  
             cov.reduce = range, CI = TRUE) +
       labs(title = "Group", x = "Fluency score", y = paste("Linear prediction", "(", unique(cue), ")"))+ 
-      scale_colour_paletteer_d("lisa::SandroBotticelli") +
+      scale_colour_paletteer_d("MoMAColors::Koons") +
       theme_few() + 
       theme(aspect.ratio = 1.5, legend.position = "top")))
 
 
 plots_lexical$emmip_plot[[1]]+plots_lexical$emmip_plot[[2]]+plots_lexical$emmip_plot[[3]]
 
+
+#raw values, looking at phon group x fluency score effect
+#looking at frequency
+ggplot(
+  data = lexical_analysis_data %>% filter(cue == "phonological"),
+  aes(x = value, y = fluency_score, group = Group, color = Group)
+) + 
+  theme_few() +
+  geom_smooth(method = "lm", se = TRUE, size = 1) +
+  geom_point(size = 2, alpha = 0.7) +   # scatter on top
+  theme(
+    legend.position = "top",
+    aspect.ratio = 1,  
+    axis.text.x = element_text(hjust = 1, face = "bold")
+  ) +
+  labs(y = "Fluency Score", x = "Phonological Similarity")+ylim(0,30)+scale_colour_paletteer_d("MoMAColors::Koons")
+
 ```
+############################################################################
 
-# Best Models
+# BEST-FIT MODELS
 ```{r}
-
 #FOR OVERALL GROUP
 
 #Getting N
@@ -294,10 +319,11 @@ lowest_bic = bic %>%
 #Looking at distribution
 lowest_bic %>%
   ggplot(aes(x = optimalBIC, fill = Group)) + facet_wrap(~Group)+
-  geom_density(fill = "#69b3a2", color = "#e9ecef", alpha = 0.8)
+  geom_density(fill = "#69b3a2", color = "#e9ecef", alpha = 0.8)+xlim(0,400)
 
-
+#BY GROUP BEST MODELS
 #median delta BIC
+#a lot of the models have highly similar values due to most p's having relatively small delta bics across models
 median_delta_bic = bic %>% 
   mutate(deltaBIC  = randomBIC - optimalBIC) %>%
   group_by(Group,everything) %>%
@@ -307,8 +333,20 @@ median_delta_bic = bic %>%
   ungroup() 
 kable(median_delta_bic)
 
+#Exploratory - comparing to mean
+#models more differentiated since some p's fit much better for some models
+mean_delta_bic = bic %>% 
+  mutate(deltaBIC  = randomBIC - optimalBIC) %>%
+  group_by(Group,everything) %>%
+  summarise(meanBIC = mean(deltaBIC)) %>%
+  arrange(desc(meanBIC)) %>%
+  slice(1:5) %>% 
+  ungroup() 
+kable(mean_delta_bic)
 
-#BY PARTICIPANT BEST MODELS 
+#both median and mean BICs return same bets-fit models for each group
+
+# Exploratory - BY PARTICIPANT BEST MODELS 
 subject_median_delta_bic = bic %>% 
   mutate(deltaBIC  = randomBIC - optimalBIC) %>%
   group_by(Subject,everything) %>%
@@ -319,29 +357,7 @@ subject_median_delta_bic = bic %>%
 
 
 ```
-
-### Best model distribution
-```{r}
-  
-best_models_p%>%
-    group_by(Group,model_type) %>%
-    count() %>%
-    ggplot(aes(x = Group, y = n, group = model_type, fill = model_type)) +
-    geom_col() +
-    labs(y = "number of participants", x = "", fill = "best model type") +  
-    theme_few() +
-    scale_fill_calc() +
-    theme(
-    aspect.ratio = 1, 
-    legend.position = 'right',  # Position legend at the top
-    axis.text.x = element_text(angle = 45, hjust = 1, face = "bold")) +
-  scale_fill_paletteer_d("rcartocolor::Antique")
-
-
-```
-
-
-# Beta Analyses
+## Beta Analyses
 ```{r}
 
 #BY GROUP
@@ -370,28 +386,6 @@ beta_summaries <- beta_results %>%
 View(beta_summaries)
 
 
-#By PARTICIPANT BEST MODELS
-best_models_p <- all_models %>%
-  filter(paste(Subject,everything) %in% paste(subject_median_delta_bic$Subject, subject_median_delta_bic$everything))
-
-#Separating out betas
-beta_values_p  = best_models_p  %>%
-  pivot_longer(names_to = "beta", cols = c(Beta_Frequency, Beta_Phonological, Beta_Semantic))
-
-# Run lm() for each beta type and extract results
-beta_results_p <- beta_values_p  %>%
-  group_by(beta) %>%                                   
-  nest() %>%                                         
- mutate(
-    model = map(data, ~ lm(value ~ Group, data = .)) 
-  )
-
-#View results
-beta_summaries_p <- beta_results_p %>%
-  mutate(model_summary = map(model, broom::tidy)) %>%
-  unnest(model_summary)
-View(beta_summaries_p)
-
 ```
 
 
@@ -417,22 +411,18 @@ beta_values %>%
   labs(y = bquote(beta ~ "(Parameter Salience)"), x = "") +
   theme_few() +
   theme() +
-  scale_fill_paletteer_d("lisa::SandroBotticelli")
+  scale_fill_paletteer_d("MoMAColors::Koons")
 
 ```
+############################################################################
 
-# Clustering Analyses
+# CLUSTERING ANALYSES
 ```{r}
 
 #BY GROUP
 #filtering to only include best method from above
 best_clusters <- all_indv%>%
   filter(paste(Group, full_method) %in% paste(best_models$Group, best_models$full_method)) %>%select(-fluency_score)%>% #this is full of NAs & produces mismatch .x/.y error, so dropping
-  group_by(Group) %>%left_join(lexical_analysis_data%>%select(Subject,Group,fluency_score)%>%unique(), by = c("Subject", "Group")) #adding fluency_score back in
-
-#Participant best models
-best_clusters_p <- all_indv%>%
-  filter(paste(Subject, full_method) %in% paste(best_models_p$Subject, best_models_p$full_method)) %>%select(-fluency_score)%>% #this is full of NAs & produces mismatch .x/.y error, so dropping
   group_by(Group) %>%left_join(lexical_analysis_data%>%select(Subject,Group,fluency_score)%>%unique(), by = c("Subject", "Group")) #adding fluency_score back in
 
 #When using the best method for each Group, does avg cluster mean differ by Group x domain
@@ -450,41 +440,17 @@ car::Anova(switch_numb_lm)
 #Replicating prev analyses where they don't include fluency score as covariate
 cluster_size_lm_no_fs = lm(data = best_clusters, Cluster_Size_mean ~ Group)
 summary(cluster_size_lm_no_fs)
-car::Anova(cluster_size_lm_no_fs)
+
 
 #When using the best method for each Group, does avg numb switches differ by Group x domain
 switch_numb_lm_no_fs = lm(data = best_clusters, Number_of_Switches ~Group)
 summary(switch_numb_lm_no_fs)
-car::Anova(switch_numb_lm_no_fs)
 
-```
+####################
 
-### Cluster Plots
-```{r}
-#cluster size
-clusters<-emmip(cluster_size_lm,Group ~ fluency_score, cov.reduce = range, CI = TRUE) + 
-  guides(color = guide_legend(title = NULL)) +
-  theme_few() +
-  scale_colour_paletteer_d("lisa::SandroBotticelli") +
-  labs(
-    x = "Fluency score",
-    y = "Predicted cluster size") +theme(aspect.ratio=.75,legend.position="right")
+#Breaking out lexical metrics within and across clusters
 
-#number of switches
-switches<-emmip(switch_numb_lm, Group ~ fluency_score, cov.reduce = range,CI=TRUE)+ 
-      guides(color = guide_legend(title = NULL)) +  
-      theme_few() + scale_colour_paletteer_d("lisa::SandroBotticelli") +
-  labs(
-    x = "Fluency score",
-    y = "Predicted number of switches")+theme(aspect.ratio=.75)
-
-clusters+switches+ plot_layout(ncol = 1)
-```
-
-# Within Cluster vs Switch Trial Lexical Metrics
-```{r}
-#By participant best models
-#filtering to only include best method for each domain
+#filtering to only include best method for each Group
 best_switches <- all_switches %>% 
   filter(paste(Group,full_method) %in% paste(best_models$Group, best_models$full_method)) %>%
   mutate(Switch_Value = if_else(Switch_Value == 2, 1, Switch_Value))
@@ -494,7 +460,7 @@ items_lexical_data <- all_lexical %>%
   group_by(Subject, Group) %>%
   mutate(row_id = row_number() - 1)  # Adjust row_id to start at 0 to account for first item
 
-#this code drops the first item from each list, and if switch_value = 1, marked as a switch trial, if switch_value=1, marked as within cluster transition, also labels clusters and switches by ordinal position
+#this code drops the first item from each list, and if switch_value = 1, marked as a switch trial, if switch_value=0, marked as within cluster transition, also labels clusters and switches by ordinal position
 #new first item only marked as within cluster if original switch_value==0
 switches_recoded <- best_switches %>%
   group_by(Subject,Group) %>%
@@ -518,13 +484,14 @@ switches_recoded <- best_switches %>%
     "phonological" = "Phonological_Similarity",
     "frequency" = "Frequency_Value"
   ) %>% filter(row_id!=0)%>% #dropping first word of each list
-  pivot_longer(names_to = "cue", cols = c(semantic, phonological, frequency))
+  pivot_longer(names_to = "cue", cols = c(semantic, phonological, frequency))%>%left_join(just_fluency)%>%rename(fluency_score=N)
 
-write.csv(switches_recoded,"switches.csv")
+#write.csv(switches_recoded,"switches.csv")
                                                                                        
                                                                                        
-## does cluster/switch designation predict semantic similarity, phonological similarity, and frequency for each Group 
+## does semantic similarity, phonological similarity, and frequency differ within clusters vs at switch points for each Group 
 # Run lmer() for each cue type and extract results
+#fluence score ns so dropped to look at 2 way
 
 switch_results <- switches_recoded  %>%
   group_by(cue) %>%                                   
@@ -542,132 +509,58 @@ switch_results$model[[2]] %>% summary()
 print("Frequency")
 switch_results$model[[3]] %>% summary()
 
-
-#Looking at ordinal effects of cluster and switch numbers
-switches_recoded_ordinal<-switches_recoded %>% mutate(Switch_Number=as.numeric(Switch_Number),Cluster_Number=as.numeric(Cluster_Number))
-
-
-#Cluster Number
-cluster_results <- switches_recoded_ordinal %>% filter(Switch=="Within Cluster Transition")%>%
-  group_by(cue) %>%                                   
-  nest() %>%                                         
- mutate(
-    model = map(data, ~ lm(value ~ Group*Cluster_Number, data = .)) 
-  )
-
-#View results
-#large so calling indp
-print("Semantic")
-cluster_results$model[[1]] %>% summary()
-print("phonological")
-cluster_results$model[[2]] %>% summary()
-print("Frequency")
-cluster_results$model[[3]] %>% summary()
-
-
-#Switch Number
-switchpoint_results <- switches_recoded_ordinal %>% filter(Switch=="Switch Trial")%>%
-  group_by(cue) %>%                                   
-  nest() %>%                                         
- mutate(
-    model = map(data, ~ lm(value ~ Group*Switch_Number, data = .)) 
-  )
-
-#View results
-#large so calling indp
-print("Semantic")
-switchpoint_results$model[[1]] %>% summary()
-print("phonological")
-switchpoint_results$model[[2]] %>% summary()
-print("Frequency")
-switchpoint_results$model[[3]] %>% summary()
-
-
 ```
 
-### WIAC Plots
+## Cluster Plots
 ```{r}
+#Avg cluster size
+clusters<-emmip(cluster_size_lm,Group ~ fluency_score, cov.reduce = range, CI = TRUE) + 
+  guides(color = guide_legend(title = NULL)) +
+  theme_few() +
+  scale_colour_paletteer_d("lisa::SandroBotticelli") +
+  labs(
+    x = "Fluency score",
+    y = "Predicted cluster size") +theme(aspect.ratio=.75,legend.position="right")
 
-# Takes a long time w dyplr, converting to data.table
-setDT(switches_recoded)
+# Number of switches
+switches<-emmip(switch_numb_lm, Group ~ fluency_score, cov.reduce = range,CI=TRUE)+ 
+      guides(color = guide_legend(title = NULL)) +  
+      theme_few() + scale_colour_paletteer_d("lisa::SandroBotticelli") +
+  labs(
+    x = "Fluency score",
+    y = "Predicted number of switches")+theme(aspect.ratio=.75)
 
-# Configure plots
-plot_configs <- list(
-  list(cue = "semantic", value_col = "value", y_label = "Semantic similarity", plot_title = ""),
-  list(cue = "phonological", value_col = "value", y_label = "Phonological similarity", plot_title = ""),
-  list(cue = "frequency", value_col = "value", y_label = "Word frequency", plot_title = "")
-)
+clusters+switches+ plot_layout(ncol = 1)
 
-# Generate plots
-wiac_cluster_plots <- map(plot_configs, ~ {
-  data_subset <- switches_recoded[cue == .x$cue]
-  
-  data_subset[, Switch := fifelse(.x$cue == "frequency" & is.na(Switch), 
-                                  "Cluster Transition", Switch)]
-  
- data_subset[, Switch := factor(Switch, levels = c("Within Cluster Transition", "Switch Trial"))]
-  
-  # Convert back to tibble for tidyboot
-  data_subset_tibble <- as_tibble(data_subset)
-  
-  boot_summary <- data_subset_tibble %>%
-    group_by(Switch, Group) %>%
-    tidyboot_mean(!!sym(.x$value_col), nboot = 1000, na.rm = TRUE)
-
-  # Plot 
-  ggplot(boot_summary, aes(fill = Switch, y = empirical_stat, x = Group)) +
-    geom_bar(stat = "identity", position = "dodge",color="black") +
-   geom_errorbar(aes(ymin = ci_lower, ymax = ci_upper), width = 0.05, position = position_dodge(0.9)) +
-   labs(
-      title = .x$plot_title,
-      y = .x$y_label,
-      x = "",
-      color = ""
-  ) +
-    theme_few() +
-    theme(
-      aspect.ratio = 1.5,
-      legend.position = "top"
-    ) +
-   scale_fill_manual(values = c("darkorange4", "coral3"))
-})
-
-wiac_cluster_plots[[1]]+
-wiac_cluster_plots[[2]]+ 
-wiac_cluster_plots[[3]]
-
-
-# Ordinal Plots
-plots_cluster_num <- cluster_results %>% 
+#Within cluster vs switch lexical plots
+plots_switch<-switch_results %>% 
   mutate(
     emmip_plot = map(model, ~ 
-      emmip(.x, Group ~ Cluster_Number,  
+      emmip(.x, Group ~ Switch ,  
             cov.reduce = range, CI = TRUE) +
-      labs(title = "Group", x = "Cluster Number", y = paste("Linear prediction", "(", unique(cue), ")")) +
+      labs(title = "", x = "Switch", y = paste("Estimated", unique(cue)))
+      +scale_colour_paletteer_d("rcartocolor::Temps")  +
+      scale_fill_paletteer_d("rcartocolor::Temps") +
       theme_few() + 
-      theme(aspect.ratio = 1.5, legend.position = "top")))
+      theme(legend.position = "top")))
+
+plots_switch$emmip_plot[[1]]
+plots_switch$emmip_plot[[2]]
+plots_switch$emmip_plot[[3]]
 
 
-plots_cluster_num$emmip_plot[[1]]+plots_cluster_num$emmip_plot[[2]]+plots_cluster_num$emmip_plot[[3]]
+#looking at frequency
+ggplot(data=switches_recoded%>%filter(cue=="frequency"),aes(x = Group, y = value, group = Switch, color = Switch)) + 
+  theme_few() +
+  geom_smooth(method = "lm", se = TRUE,size=1) +
+  theme(legend.position="top",
+    aspect.ratio = 1,  
+    axis.text.x = element_text( hjust = 1, face = "bold"))+labs(y = "frequency", x = "Group")
 
-
-
-# Ordinal Plots
-plots_switch_num <- switchpoint_results %>% 
-  mutate(
-    emmip_plot = map(model, ~ 
-      emmip(.x, Group ~ Switch_Number,  
-            cov.reduce = range, CI = TRUE) +
-      labs(title = "Group", x = "Switch Number", y = paste("Linear prediction", "(", unique(cue), ")"))+
-      theme_few() + 
-      theme(aspect.ratio = 1.5, legend.position = "top")))
-
-
-plots_switch_num$emmip_plot[[1]]+plots_switch_num$emmip_plot[[2]]+plots_switch_num$emmip_plot[[3]]
 
 ```
-
-# Exploring Battery Measures for PWA
+################################################################
+# PWA BATTERY MEASURES
 ```{r}
 
 #Battery descriptions & means from Mirman et al. (2015)
@@ -699,7 +592,6 @@ plots_switch_num$emmip_plot[[1]]+plots_switch_num$emmip_plot[[2]]+plots_switch_n
 #Performance is measured by percent correct of 60 trials: M=47.3, SD=25.8, Range=0–98.
 
 #set up dfs
-
 battery <- pwa_dx %>%
   rename(Subject = Fluency.ID) %>% filter(Subject %in% all_indv$Subject)%>%
   select(Subject, TCorrPNT, TrueSem, TrueFor, TrueMix, TrueNonW, prt, syntot., camcac.,nonwdrep..) %>%
@@ -717,7 +609,7 @@ participant_drop_list <- battery %>%
 
 #creating composite measures
 battery<-battery %>%mutate(semantic_output=TrueSem+TrueMix, phon_output=TrueNonW+TrueFor) %>%filter(!Subject %in% participant_drop_list$Subject) #drop duplicates
-write.csv(battery,"battery.csv")
+#write.csv(battery,"battery.csv")
 
 
 #LOOKING AT CORRELATIONS
@@ -728,6 +620,7 @@ corrplot(cor(battery%>%select(-Subject,-TrueSem,-TrueMix,-TrueFor,-TrueNonW)))
 pwa_avg_length<-pwa_lengths %>%  group_by(Subject) %>%
   summarize(avg_length = mean(Phoneme.Count, na.rm = TRUE))
 
+#set up dfs
 
 lexical_battery_wide<-all_indv %>% select(Subject, Group, Semantic_Similarity_mean, Phonological_Similarity_mean, Frequency_Value_mean, 
          fluency_score) %>% na.omit() %>%filter(Group=="PWA") %>%left_join(battery,by="Subject")  %>% na.omit() %>%
@@ -748,37 +641,39 @@ lexical_battery<-all_indv %>% select(Subject, Group, Semantic_Similarity_mean, P
 
 
 #Clustering df
-##Note this is using participant best model
-clusters_battery<-best_clusters_p %>%filter(Group=="PWA") %>%left_join(battery,by="Subject")%>%filter(!Subject %in% participant_drop_list$Subject)
+clusters_battery<-best_clusters %>%filter(Group=="PWA") %>%left_join(battery,by="Subject")%>%filter(!Subject %in% participant_drop_list$Subject)
 write.csv(clusters_battery,"clustering_metrics_battery.csv") # save to csv
 
 
 ```
 ## Lexical Analyses
 ```{r}
-
+#do battery measures predict fluency
 fluency_battery_lm = lm(data = lexical_battery, fluency_score ~ TCorrPNT+semantic_output+phon_output+prt+syntot.+camcac.+nonwdrep..+avg_length)
 summary(fluency_battery_lm)
 car::Anova(fluency_battery_lm)
 
 
-#Does semantic similarity, phonological similarity, and frequency differ across measures
+#Do battery measures predict semantic similarity, phonological similarity, and word frequency
 # Run lm() for each cue and extract results
 lexical_battery_results <- lexical_battery  %>%
   group_by(cue) %>%                                   # Group by cue
   nest() %>%                                         # Nest data by cue
  mutate(
-    model = map(data, ~ lm(value ~ TCorrPNT+semantic_output+phon_output+prt+syntot.+camcac.+nonwdrep..+avg_length, data = .)) # Fit models
+    model = map(data, ~ lm(value ~ TCorrPNT+semantic_output+phon_output+prt+syntot.+camcac.+nonwdrep..+avg_length+fluency_score, data = .)) # Fit models
   )
 #View results
 model_battery_summaries <- lexical_battery_results %>%
   mutate(model_summary = map(model, broom::tidy)) %>%
   unnest(model_summary)
 View(model_battery_summaries)
+
+#for verbal semantic processing/comprehension tasks (syntot), high performance assc with lower inter-item phonological similarity in SFT  (less interference/more control over semantic processing)
+#for NON verbal semantic association/processing tasks (camcac), high score assc with high avg inter-item phonological similarity in SFT
+
 ```
 
-### Fluency Plots
-
+## Battery x Fluency Plots
 ```{r}
 emm_results <- list(
   TCorrPNT = emmeans(fluency_battery_lm, ~ TCorrPNT, cov.reduce = range),
@@ -819,111 +714,124 @@ plot_phon <- emmip(emm_results$phon_output, ~ phon_output, CIs = TRUE) +
   theme(aspect.ratio = 1.5, legend.position = "top")
 plot_phon
 
-#Synonymy (syntot)
-plot_syntot <- emmip(emm_results$syntot., ~ syntot., CIs = TRUE) +
-  labs(title = "",
-       x = "syntot score", 
-       y = "Estimated Fluency Score")  +
-  theme_few() +
-  theme(aspect.ratio = 1.5, legend.position = "top")
-plot_syntot
-
-
-#Nonword repetition
-plot_nwr <- emmip(emm_results$nonwdrep.., ~ nonwdrep.., CIs = TRUE) +
-  labs(title = "",
-       x = "nonword repetition score", 
-       y = "Estimated Fluency Score")  +
-  theme_few() +
-  theme(aspect.ratio = 1.5, legend.position = "top")
-plot_nwr
-
-#the better the performance on the PNT & syntot, the higher the fluency score
+#the better the performance on the PNT, the higher the fluency score
 #But those with higher frequency scores also produced more form errors in PNT
 ```
-### Lexical plots
+## Battery x Lexical plots
 
 ```{r}
+# camels & cactus and synonymy triplet x phonological similarity
 
-#just significant effects/predictors
-predictors_phon <- c( "syntot.", "camcac.")
+# match prev PWA color
+koons_colors <- paletteer_d("MoMAColors::Koons")
+second_color <- koons_colors[2]
 
-plots_lexical_phon <- lexical_battery_results %>% filter(cue=="phonological")%>%
-  mutate(
-    emmip_plot = map2(model, cue, ~ {
-      predictor_plots <- map(predictors_phon, function(pred) {
-        emm <- emmeans(.x, as.formula(paste("~", pred)), cov.reduce = range)
-        emmip(emm, as.formula(paste("~", pred)), CIs = TRUE) +
-          labs(title = paste("",  ""),
-               x = pred, 
-               y = "Estimated Phonological Similarity")  +
-          theme_few() +
-          theme(aspect.ratio = 1.5, legend.position = "top")
-      })
-      patchwork::wrap_plots(predictor_plots)  # Combine
-    })
-  )
+# plot raw score scatter with model predicted line & CI
+overlay_emm_scatter <- function(model, df, pred, y_lab) {
+  # Get EMM predictions as df
+  emm <- emmeans(model, as.formula(paste("~", pred)), cov.reduce = range)
+  emm_df <- as.data.frame(emm) 
+  
+  ggplot() +
+    # Raw scatter 
+    geom_point(
+      data = df,
+      aes(x = .data[[pred]], y = value),
+      size = 2, alpha = 0.7, color = second_color) +
+    # EMM CI ribbon
+    geom_ribbon(
+      data = emm_df,
+      aes(x = .data[[pred]], ymin = lower.CL, ymax = upper.CL),
+      alpha = 0.2, fill = "cyan4") +
+    # EMM mean line
+    geom_line(
+      data = emm_df,
+      aes(x = .data[[pred]], y = emmean),
+      linewidth = 1, color = "cyan4") +
+    theme_few() +
+    theme(
+      legend.position = "none",
+      aspect.ratio = 1.5,
+      axis.text.x = element_text(hjust = 1, face = "bold")) +
+    labs(x = pred, y = y_lab)}
 
-plots_lexical_phon$emmip_plot[[1]]
+# Filter data/models 
+df_phon   <- lexical_battery %>% filter(cue == "phonological")
+res_phon  <- lexical_battery_results %>% filter(cue == "phonological")
 
-#for verbal semantic processing/comprehension tasks (syntot), high performance assc with lower inter-item phonological similarity in SFT  (less interference/more control over semantic processing)
-#for NON verbal semantic association/processing tasks (camcac), high score assc with high avg inter-item phonological similarity in SFT
+# get model results
+mod <- lexical_battery_results$model[[2]]
+
+# overlay
+camel_overlay  <- overlay_emm_scatter(
+  model = mod,
+  df    = df_phon,
+  pred  = "camcac.",
+  y_lab = "Estimated Phonological Similarity")
+
+syntot_overlay <- overlay_emm_scatter(
+  model = mod,
+  df    = df_phon,
+  pred  = "syntot.", 
+  y_lab = "Estimated Phonological Similarity")
 
 
-predictors_freq <- c( "TCorrPNT", "phon_output","avg_length")
-
-plots_lexical_freq <- lexical_battery_results %>% filter(cue=="frequency")%>%
-  mutate(
-    emmip_plot = map2(model, cue, ~ {
-      predictor_plots <- map(predictors_freq, function(pred) {
-        emm <- emmeans(.x, as.formula(paste("~", pred)), cov.reduce = range)
-        emmip(emm, as.formula(paste("~", pred)), CIs = TRUE) +
-          labs(title = paste("",  ""),
-               x = pred, 
-               y = "Estimated Avg Word Frequency")  +
-          theme_few() +
-          theme(aspect.ratio = 1.5, legend.position = "top")
-      })
-      patchwork::wrap_plots(predictor_plots)  # Combine
-    })
-  )
-
-plots_lexical_freq$emmip_plot[[1]]
-
+camel_overlay + syntot_overlay
 ```
 ## Cluster Analyses
 ```{r}
 #When using the best method, does avg cluster mean differ by battery measures
 cluster_battery_lm = lm(data = clusters_battery, Cluster_Size_mean ~ TCorrPNT+semantic_output+phon_output+prt+syntot.+camcac.)
 summary(cluster_battery_lm)
-car::Anova(cluster_battery_lm)
 #all ns
 
 switch_battery_lm = lm(data = clusters_battery, Number_of_Switches ~ TCorrPNT+semantic_output+phon_output+prt+syntot.+camcac.)
 summary(switch_battery_lm)
-car::Anova(switch_battery_lm)
-# sig predictor of syntot
-
 #All ns
 
 ```
 
-
-### Cluster Plots
+################################################
+#Demographics
 
 ```{r}
-emm_results_switch <- list(
-  syntot. = emmeans(switch_battery_lm, ~ syntot., cov.reduce = range)
-)
+#import demographics
+dx<-dx%>%rename(Subject=ID)
+demos<-read.csv("../excel_data/demographics.csv") %>%rename("Subject"="Fluency.ID")%>%filter(Subject %in% all_lexical$Subject)%>%left_join(dx)
 
-#plot sig predictors
-switch_syntot <- emmip(emm_results_switch$syntot., ~ syntot., CIs = TRUE) +
-  labs(title = "",
-       x = "syntot.", 
-       y = "Number of Switches") +
-  theme_few() +
-  theme(aspect.ratio = 1.5, legend.position = "top")
-switch_syntot
+# subtypes
+type_summary <- demos %>% filter(Group=="PWA")%>%group_by(Group)%>%
+  count(LangDx) %>%
+  mutate(prop = n / sum(n))
+type_summary
+
+# gender
+gender_summary <- demos %>% group_by(Group)%>%
+  count(Gender) %>%
+  mutate(prop = n / sum(n))
+gender_summary
+
+# age
+avg_age <- demos %>%group_by(Group)%>%
+  summarise(
+    mean_age = mean(Age, na.rm = TRUE),
+    sd_age   = sd(Age, na.rm = TRUE),
+    min_age  = min(Age, na.rm = TRUE),
+    max_age  = max(Age, na.rm = TRUE))
+avg_age
+
+# education
+edu_summary <- demos %>%group_by(Group)%>%
+  count(Education) %>%
+  mutate(prop = n / sum(n))
+edu_summary
+
+# race
+race_summary <- demos %>%group_by(Group)%>%
+  count(EthnicGrp) %>%
+  mutate(prop = n / sum(n))
+race_summary
+
 ```
 
 
@@ -931,5 +839,4 @@ switch_syntot
 
 
 
-```{r}
-```{r}
+
