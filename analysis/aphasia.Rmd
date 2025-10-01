@@ -50,7 +50,7 @@ pwa_fluency <- pwa_fluency %>% select(-X1) %>%
                values_to = "Entry") %>%select(-Word) %>%filter(Entry != "") 
 
 #Link dx
-dx<-pwa_dx %>%select(Fluency.ID,LangDx) %>% rename(ID=Fluency.ID) %>% mutate(ID = as.character(ID))%>%distinct(ID, .keep_all = TRUE)
+dx<-pwa_dx %>%select(Fluency.ID,LangDx,WABAQ) %>% rename(ID=Fluency.ID) %>% mutate(ID = as.character(ID))%>%distinct(ID, .keep_all = TRUE)
 pwa_fluency<-pwa_fluency %>%
   left_join(dx,by="ID") %>%
   mutate(LangDx = str_to_lower(LangDx)) %>%mutate_all(~str_replace_all(., "\\s+", ""))
@@ -193,14 +193,14 @@ fluency_plot <- lexical_analysis_data %>%
              color = Group)) +
   geom_violin(trim = FALSE, alpha = 0.95,color="black") +
   ylim(0, 50) +  
-  labs(y = "Fluency Score", x = "", title = "") +
+  labs(y = "Fluency Score", x = "", title = "Fluency Score") +
   theme_few() +
   theme(
     aspect.ratio = 1, 
     axis.text.y = element_text(size = 12),
     axis.text.x = element_text(size = 12),
     legend.position = "none",   # redundant with x-axis
-    plot.title = element_text(size = 18)  
+    plot.title = element_text(size = 14, hjust = 0.5)  
   ) +
   scale_fill_paletteer_d("MoMAColors::Koons") +
   scale_color_paletteer_d("MoMAColors::Koons")
@@ -211,12 +211,12 @@ length_plot <- lexical_analysis_data %>%
   ggplot(aes(x = Group, y = avg_length, fill = Group)) +
   geom_boxplot(color = "black") +
   ylim(2,6) +  
-  labs(y = 'Average Word Length (# of Phonemes)', x = "Group", title = "") +
+  labs(y = 'Average Word Length (# of Phonemes)', x = "Group", title = "Word Length") +
   theme_few() +
   theme(
     aspect.ratio = 1, axis.text.y = element_text(size = 12),axis.text.x = element_text(size = 12),
     legend.position = 'right',
-    plot.title = element_text(size = 18)  
+    plot.title = element_text(size = 14, hjust = 0.5) 
   ) +
   scale_fill_paletteer_d("MoMAColors::Koons") 
 fluency_plot+length_plot
@@ -592,57 +592,81 @@ ggplot(data=switches_recoded%>%filter(cue=="frequency"),aes(x = Group, y = value
 #Performance is measured by percent correct of 60 trials: M=47.3, SD=25.8, Range=0–98.
 
 #set up dfs
-battery <- pwa_dx %>%
-  rename(Subject = Fluency.ID) %>% filter(Subject %in% all_indv$Subject)%>%
-  select(Subject, TCorrPNT, TrueSem, TrueFor, TrueMix, TrueNonW, prt, syntot., camcac.,nonwdrep..) %>%
+battery_long <- pwa_dx %>%
+  group_by(Fluency.ID) %>%
+  slice_head(n = 1) %>%
+  ungroup() %>%
+  rename(Subject = Fluency.ID) %>%
+  filter(Subject %in% all_indv$Subject) %>%
+  select(Subject, TCorrPNT, TrueSem, TrueFor, TrueMix, TrueNonW, prt, syntot., camcac., nonwdrep..) %>%
   mutate(
     Subject = as.factor(Subject),
-    across(-Subject, ~ as.numeric(as.character(.))) 
+    across(-Subject, ~ suppressWarnings(as.numeric(as.character(.))))
   ) %>%
-  na.omit()
+  mutate(
+    semantic_output = rowSums(across(c(TrueSem, TrueMix)), na.rm = TRUE),
+    phon_output     = rowSums(across(c(TrueNonW, TrueFor)), na.rm = TRUE)
+  ) %>%
+  select(-TrueSem, -TrueMix, -TrueNonW, -TrueFor) %>%
+  pivot_longer( # put in long format for outlier drops
+    cols = c(TCorrPNT, semantic_output, phon_output, prt, syntot., camcac., nonwdrep..),
+    names_to = "test",
+    values_to = "value"
+  ) %>%
+  group_by(test) %>% #remove outliers via MAD
+  filter(!is.na(value)) %>%
+  mutate(
+    MAD = 3 * mad(value, na.rm = TRUE),
+    med = median(value, na.rm = TRUE),
+    L   = med - MAD,
+    U   = med + MAD,
+    is_outlier = (value < L | value > U))
 
-#NOTE 9 IDs have two entries - dropping these  
-participant_drop_list <- battery %>%
-  count(Subject) %>%  
-  filter(n > 1) %>%  
-  select(Subject)
+# Keep the filtered data (no outliers), put into wide format
+battery_clean<- battery_long %>%
+  filter(!is_outlier) %>%
+  select(-med, -MAD, -L, -U, -is_outlier) %>%
+  pivot_wider(
+    id_cols = Subject,
+    names_from = test,
+    values_from = value)
 
-#creating composite measures
-battery<-battery %>%mutate(semantic_output=TrueSem+TrueMix, phon_output=TrueNonW+TrueFor) %>%filter(!Subject %in% participant_drop_list$Subject) #drop duplicates
-#write.csv(battery,"battery.csv")
+
+# check dropped values by test
+battery_outliers <- battery_long %>%
+  filter(is_outlier)
+battery_outliers %>%
+  arrange(test, value) %>%
+  select(Subject, test, value, L, U, med, MAD)
 
 
 #LOOKING AT CORRELATIONS
 library(corrplot)
-corrplot(cor(battery%>%select(-Subject,-TrueSem,-TrueMix,-TrueFor,-TrueNonW)))
+corrplot(cor(battery_clean%>%select(-Subject)%>%na.omit()))
+
+#####
+
+#set up dfs
 
 #getting word lengths
 pwa_avg_length<-pwa_lengths %>%  group_by(Subject) %>%
   summarize(avg_length = mean(Phoneme.Count, na.rm = TRUE))
 
-#set up dfs
-
-lexical_battery_wide<-all_indv %>% select(Subject, Group, Semantic_Similarity_mean, Phonological_Similarity_mean, Frequency_Value_mean, 
-         fluency_score) %>% na.omit() %>%filter(Group=="PWA") %>%left_join(battery,by="Subject")  %>% na.omit() %>%
-  rename("semantic" = "Semantic_Similarity_mean", 
-         "phonological" = "Phonological_Similarity_mean",
-         "frequency" = "Frequency_Value_mean") %>% unique()%>%filter(!Subject %in% participant_drop_list$Subject)
-write.csv(lexical_battery_wide,"lexical_metrics_battery.csv") # save wide version to csv
-
-
-#Lexical df
+# Lexical wide
 lexical_battery<-all_indv %>% select(Subject, Group, Semantic_Similarity_mean, Phonological_Similarity_mean, Frequency_Value_mean, 
-         fluency_score) %>% na.omit() %>%filter(Group=="PWA") %>%left_join(battery,by="Subject") %>%left_join(pwa_avg_length,by="Subject") %>% na.omit() %>%
+         fluency_score) %>% na.omit() %>%filter(Group=="PWA") %>%left_join(battery_clean,by="Subject") %>% left_join(pwa_avg_length,by="Subject")%>%
   rename("semantic" = "Semantic_Similarity_mean", 
          "phonological" = "Phonological_Similarity_mean",
          "frequency" = "Frequency_Value_mean")%>%
-  pivot_longer(names_to = "cue", cols=c(semantic,phonological,frequency)) %>%filter(!Subject %in% participant_drop_list$Subject)
-
+  pivot_longer(names_to = "cue", cols=c(semantic,phonological,frequency))
+  
 
 
 #Clustering df
-clusters_battery<-best_clusters %>%filter(Group=="PWA") %>%left_join(battery,by="Subject")%>%filter(!Subject %in% participant_drop_list$Subject)
+clusters_battery<-best_clusters %>%filter(Group=="PWA") %>%left_join(battery_clean,by="Subject")
 write.csv(clusters_battery,"clustering_metrics_battery.csv") # save to csv
+
+
 
 
 ```
@@ -656,7 +680,7 @@ car::Anova(fluency_battery_lm)
 
 #Do battery measures predict semantic similarity, phonological similarity, and word frequency
 # Run lm() for each cue and extract results
-lexical_battery_results <- lexical_battery  %>%
+lexical_battery_results <- lexical_battery  %>% filter(Subject!="20007")%>% #Dropping this weird p drops the syntot effect
   group_by(cue) %>%                                   # Group by cue
   nest() %>%                                         # Nest data by cue
  mutate(
@@ -832,6 +856,9 @@ race_summary <- demos %>%group_by(Group)%>%
   mutate(prop = n / sum(n))
 race_summary
 
+
+# for table
+table_df<-lexical_battery%>%left_join(demos)%>%select(-cue,-value)%>%unique()
 ```
 
 
