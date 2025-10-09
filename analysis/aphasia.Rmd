@@ -25,7 +25,8 @@ library(knitr)
 library(patchwork)
 library(data.table)
 library(ggpattern)
-
+library(dplyr)
+library(gt)
 ```
 
 ## Import Raw Data
@@ -42,7 +43,7 @@ pwa_dx<-read.csv("../excel_data/3_PWA_BatteryData_NoID.csv")
 control_fluency <- control_fluency %>% select(-X1) %>%
   pivot_longer(cols = starts_with("X"),  
                names_to = "Word",           
-               values_to = "Entry") %>%select(-Word) %>%filter(Entry != "") %>% rename(ID=Fluency.Code)
+               values_to = "Entry") %>% select(-Word) %>% filter(Entry != "") %>% rename(ID=Fluency.Code)
 
 pwa_fluency <- pwa_fluency %>% select(-X1) %>%
   pivot_longer(cols = starts_with("X"),  
@@ -161,8 +162,17 @@ lexical_analysis_data<-all_indv %>% select(Subject, Group, Semantic_Similarity_m
 #Does fluency score differ by group, avg word length as a covariate (*Tested as intx, no sig diff in models)
 fluency_lm = lm(data = lexical_analysis_data, fluency_score ~ Group+avg_length)
 summary(fluency_lm)
-car::Anova(fluency_lm)
-
+#tbl_df <- broom.mixed::tidy(fluency_lm, effects = "fixed", conf.int = TRUE) %>%
+ # transmute(
+ #   Term = term,
+ #   Estimate = round(estimate, 3),
+ #   `CI_low` = round(conf.low, 3),
+ #   `CI_high` = round(conf.high, 3),
+  #  t_value = round(statistic, 3),
+  #  SE = round(std.error, 3),
+  #  p_value = signif(p.value, 3)
+ # )
+#write.csv(tbl_df, "fluency_model_results.csv", row.names = FALSE)
 
 #Does semantic similarity, phonological similarity, and frequency differ across Groups
 # Run lm() for each cue and extract results
@@ -178,7 +188,22 @@ model_summaries <- lexical_results %>%
   unnest(model_summary)
 View(model_summaries)
 
+#tbl_df <- lexical_results %>%
+#  mutate(tidy_model = map(model, ~ broom::tidy(.x, conf.int = TRUE))) %>%
+#  unnest(tidy_model) %>%
+#  transmute(
+ #   Cue = cue,
+ #   Term = term,
+ #   Estimate = round(estimate, 3),
+  #  CI_low = round(conf.low, 3),
+  #  CI_high = round(conf.high, 3),
+  #  t_value = round(statistic, 3),
+ #   SE = round(std.error, 3),
+ #   p_value = signif(p.value, 3)
+ # )
 
+# Write to CSV
+#write.csv(tbl_df, "lexical_model_results.csv", row.names = FALSE)
 
 ```
 
@@ -300,7 +325,7 @@ random_nLL_lookup <- all_models %>%
 full_model_data_parameters<-all_models %>%mutate(parameter_link=paste(model_type,method,sep="_"))
 
 #importing parameter counts
-parameters<-read.csv("Aphasia_BIC_Parameters.csv") %>%select(parameter_link,k)
+parameters<-read.csv("BICparams_noswitch.csv") %>%select(parameter_link,k)
 
 bic <- full_model_data_parameters %>%
   left_join(just_fluency, by = c("Subject", "Group")) %>%
@@ -310,51 +335,67 @@ bic <- full_model_data_parameters %>%
     optimalBIC = k * log(N) - 2 * (-Negative_Log_Likelihood_Optimized),
     randomBIC = random_k * log(N) - 2 * (-random_nLLs))
 
-
 #lowest BIC model per participant
 lowest_bic = bic %>%
   group_by(Subject) %>%
   slice_min(optimalBIC)
 
-#Looking at distribution
+#look at mean vs median bic across everyone, what is the spread - which model is lowest
+
+# Looking at distribution
+# optimal BIC
 lowest_bic %>%
   ggplot(aes(x = optimalBIC, fill = Group)) + facet_wrap(~Group)+
-  geom_density(fill = "#69b3a2", color = "#e9ecef", alpha = 0.8)+xlim(0,400)
+  geom_density(fill = "#69b3a2", color = "#e9ecef", alpha = 0.8)+xlim(50,400)
+
+lowest_bic %>%
+  ggplot( aes(x=Group, y=optimalBIC, fill=Group)) +
+    geom_boxplot() +
+    geom_jitter(color="black", size=2, alpha=0.9) +
+    theme(
+      legend.position="none",
+      plot.title = element_text(size=11)) 
+
+
+
+#######################################
 
 #BY GROUP BEST MODELS
-#median delta BIC
-#a lot of the models have highly similar values due to most p's having relatively small delta bics across models
-median_delta_bic = bic %>% 
-  mutate(deltaBIC  = randomBIC - optimalBIC) %>%
+#median OPTIMAL BIC
+median_bic = bic %>% 
+  #mutate(deltaBIC  = randomBIC - optimalBIC) %>%
   group_by(Group,everything) %>%
-  summarise(medianBIC = median(deltaBIC)) %>%
-  arrange(desc(medianBIC)) %>%
-  slice(1) %>% 
+  summarise(medianBIC = median(optimalBIC)) %>%
+  arrange(medianBIC) %>%
+  slice(1:5) %>% 
   ungroup() 
-kable(median_delta_bic)
+kable(median_bic)
 
 #Exploratory - comparing to mean
 #models more differentiated since some p's fit much better for some models
-mean_delta_bic = bic %>% 
-  mutate(deltaBIC  = randomBIC - optimalBIC) %>%
+mean_bic = bic %>%
+ # mutate(deltaBIC  = randomBIC - optimalBIC) %>%
   group_by(Group,everything) %>%
-  summarise(meanBIC = mean(deltaBIC)) %>%
-  arrange(desc(meanBIC)) %>%
+  summarise(meanBIC = mean(optimalBIC)) %>%
+  arrange(meanBIC) %>%
   slice(1:5) %>% 
   ungroup() 
-kable(mean_delta_bic)
+kable(mean_bic)
 
-#both median and mean BICs return same bets-fit models for each group
+#both median and mean BICs return same best-fit models for each group
 
 # Exploratory - BY PARTICIPANT BEST MODELS 
-subject_median_delta_bic = bic %>% 
-  mutate(deltaBIC  = randomBIC - optimalBIC) %>%
-  group_by(Subject,everything) %>%
-  summarise(medianBIC = median(deltaBIC)) %>%
-  arrange(desc(medianBIC)) %>%
+subject_median_bic = bic %>% 
+  #mutate(deltaBIC  = randomBIC - optimalBIC) %>%
+  group_by(Subject,Group,everything) %>%
+  summarise(medianBIC = median(optimalBIC)) %>%
+  arrange(medianBIC) %>%
   slice(1) %>% 
-  ungroup() 
-
+  ungroup() %>%
+  separate(everything, 
+           into = c("model_type", "method", "param1", "param2", "param3"), #separating out model parameters
+           sep = "_", 
+           fill = "right")
 
 ```
 ## Beta Analyses
@@ -363,7 +404,7 @@ subject_median_delta_bic = bic %>%
 #BY GROUP
 #Filtering full data to only include best model for each domain type
 best_models <- all_models %>%
-  filter(paste(Group,everything) %in% paste(median_delta_bic$Group, median_delta_bic$everything)) %>%
+  filter(paste(Group,everything) %in% paste(mean_bic$Group, mean_bic$everything)) %>%
   group_by(Group)
 
 #Separating out betas
@@ -378,6 +419,22 @@ beta_results <- beta_values  %>%
  mutate(
     model = map(data, ~ lm(value ~ Group, data = .)) 
   )
+
+
+#tbl_df <- beta_results %>%
+#  mutate(tidy_model = map(model, ~ broom::tidy(.x, conf.int = TRUE))) %>%
+ # unnest(tidy_model) %>%
+ # transmute(
+ # Term = term,
+ #   Estimate = round(estimate, 3),
+ #   CI_low = round(conf.low, 3),
+  #  CI_high = round(conf.high, 3),
+ #  t_value = round(statistic, 3),
+ #   SE = round(std.error, 3),
+  #  p_value = signif(p.value, 3)
+ # )
+# Write to CSV
+#write.csv(tbl_df, "beta_model_results.csv", row.names = FALSE)
 
 #View results
 beta_summaries <- beta_results %>%
@@ -430,12 +487,34 @@ best_clusters <- all_indv%>%
 cluster_size_lm = lm(data = best_clusters, Cluster_Size_mean ~ Group + fluency_score)
 summary(cluster_size_lm)
 car::Anova(cluster_size_lm)
+#tbl_df <- broom.mixed::tidy(cluster_size_lm, effects = "fixed", conf.int = TRUE) %>%
+ # transmute(
+ #   Term = term,
+  #  Estimate = round(estimate, 3),
+  #  `CI_low` = round(conf.low, 3),
+  #  `CI_high` = round(conf.high, 3),
+ #   t_value = round(statistic, 3),
+  #  SE = round(std.error, 3),
+  #  p_value = signif(p.value, 3)
+#)
+#write.csv(tbl_df, "cluster_model_results.csv", row.names = FALSE)
 
 #When using the best method for each Group, does avg numb switches differ by Group x domain
 switch_numb_lm = lm(data = best_clusters, Number_of_Switches ~Group + fluency_score)
 summary(switch_numb_lm)
 car::Anova(switch_numb_lm)
 
+#tbl_df <- broom.mixed::tidy(switch_numb_lm, effects = "fixed", conf.int = TRUE) %>%
+ # transmute(
+ #  Term = term,
+ #   Estimate = round(estimate, 3),
+ #  `CI_low` = round(conf.low, 3),
+  #  `CI_high` = round(conf.high, 3),
+  #  t_value = round(statistic, 3),
+  # SE = round(std.error, 3),
+  #  p_value = signif(p.value, 3)
+ #)
+#write.csv(tbl_df, "switchnum_model_results.csv", row.names = FALSE)
 
 #Replicating prev analyses where they don't include fluency score as covariate
 cluster_size_lm_no_fs = lm(data = best_clusters, Cluster_Size_mean ~ Group)
@@ -497,7 +576,7 @@ switch_results <- switches_recoded  %>%
   group_by(cue) %>%                                   
   nest() %>%                                         
  mutate(
-    model = map(data, ~ lm(value ~ Group*Switch, data = .)) 
+    model = map(data, ~ lm(value ~ Group*Switch*fluency_score, data = .)) 
   )
 
 #View results
@@ -539,14 +618,22 @@ plots_switch<-switch_results %>%
       emmip(.x, Group ~ Switch ,  
             cov.reduce = range, CI = TRUE) +
       labs(title = "", x = "Switch", y = paste("Estimated", unique(cue)))
-      +scale_colour_paletteer_d("rcartocolor::Temps")  +
-      scale_fill_paletteer_d("rcartocolor::Temps") +
+      +scale_colour_paletteer_d("tvthemes::Alexandrite")  +
+      scale_fill_paletteer_d("tvthemes::Alexandrite") +
       theme_few() + 
       theme(legend.position = "top")))
 
 plots_switch$emmip_plot[[1]]
 plots_switch$emmip_plot[[2]]
 plots_switch$emmip_plot[[3]]
+
+#phon sim and fluency score
+ggplot(data=switches_recoded%>%filter(cue=="phonological"),aes(y = fluency_score, x = value, group = Switch, color = Switch)) + facet_wrap(~Group)+
+  theme_few() +
+  geom_smooth(method = "lm", se = TRUE,size=1) +
+  theme(legend.position="top",
+    aspect.ratio = 1,  
+    axis.text.x = element_text( hjust = 1, face = "bold"))+labs(x = "Phonological Similarity", y = "Fluency Score")
 
 
 #looking at frequency
@@ -677,6 +764,17 @@ fluency_battery_lm = lm(data = lexical_battery, fluency_score ~ TCorrPNT+semanti
 summary(fluency_battery_lm)
 car::Anova(fluency_battery_lm)
 
+#tbl_df <- broom.mixed::tidy(fluency_battery_lm, effects = "fixed", conf.int = TRUE) %>%
+#  transmute(
+#    Term = term,
+ #   Estimate = round(estimate, 3),
+#    `CI_low` = round(conf.low, 3),
+ #   `CI_high` = round(conf.high, 3),
+ #   t_value = round(statistic, 3),
+ #   SE = round(std.error, 3),
+ #   p_value = signif(p.value, 3)
+ #)
+#write.csv(tbl_df, "fluency_battery_model_results.csv", row.names = FALSE)
 
 #Do battery measures predict semantic similarity, phonological similarity, and word frequency
 # Run lm() for each cue and extract results
@@ -691,6 +789,24 @@ model_battery_summaries <- lexical_battery_results %>%
   mutate(model_summary = map(model, broom::tidy)) %>%
   unnest(model_summary)
 View(model_battery_summaries)
+
+
+#tbl_df <- lexical_battery_results %>%
+#  mutate(tidy_model = map(model, ~ broom::tidy(.x, conf.int = TRUE))) %>%
+ # unnest(tidy_model) %>%
+#  transmute(
+ #   Cue = cue,
+ #  Term = term,
+  #  Estimate = round(estimate, 3),
+ #   CI_low = round(conf.low, 3),
+  #  CI_high = round(conf.high, 3),
+  #  t_value = round(statistic, 3),
+  #  SE = round(std.error, 3),
+  #  p_value = signif(p.value, 3)
+ # )
+
+# Write to CSV
+#write.csv(tbl_df, "lexical_battery_model_results.csv", row.names = FALSE)
 
 #for verbal semantic processing/comprehension tasks (syntot), high performance assc with lower inter-item phonological similarity in SFT  (less interference/more control over semantic processing)
 #for NON verbal semantic association/processing tasks (camcac), high score assc with high avg inter-item phonological similarity in SFT
@@ -804,7 +920,7 @@ camel_overlay + syntot_overlay
 ```
 ## Cluster Analyses
 ```{r}
-#When using the best method, does avg cluster mean differ by battery measures
+#When using the best method, does avg cluster size relate to battery measure performance
 cluster_battery_lm = lm(data = clusters_battery, Cluster_Size_mean ~ TCorrPNT+semantic_output+phon_output+prt+syntot.+camcac.)
 summary(cluster_battery_lm)
 #all ns
@@ -858,7 +974,13 @@ race_summary
 
 
 # for table
-table_df<-lexical_battery%>%left_join(demos)%>%select(-cue,-value)%>%unique()
+battery_wide<-battery_long%>%
+    pivot_wider(
+    id_cols = Subject,
+    names_from = test,
+    values_from = value)
+table_df<-battery_wide%>%left_join(demos)%>%unique()
+write.csv(table_df,"table_info.csv")
 ```
 
 
