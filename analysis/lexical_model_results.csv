@@ -1,0 +1,16 @@
+"cue","Cue","Term","Estimate","CI_low","CI_high","t_value","SE","p_value"
+"semantic","semantic","(Intercept)",0.409,0.341,0.477,11.983,0.034,1.05e-20
+"semantic","semantic","GroupPWA",0.012,-0.041,0.065,0.465,0.027,0.643
+"semantic","semantic","fluency_score",0.002,0,0.003,1.898,0.001,0.0607
+"semantic","semantic","avg_length",-0.002,-0.015,0.011,-0.286,0.006,0.775
+"semantic","semantic","GroupPWA:fluency_score",0,-0.003,0.003,-0.163,0.002,0.871
+"phonological","phonological","(Intercept)",0.063,-0.009,0.135,1.736,0.036,0.0859
+"phonological","phonological","GroupPWA",-0.074,-0.13,-0.018,-2.608,0.028,0.0106
+"phonological","phonological","fluency_score",0,-0.002,0.002,-0.076,0.001,0.94
+"phonological","phonological","avg_length",0.003,-0.011,0.016,0.408,0.007,0.684
+"phonological","phonological","GroupPWA:fluency_score",0.004,0.001,0.008,2.437,0.002,0.0167
+"frequency","frequency","(Intercept)",4.771,4.475,5.068,31.958,0.149,1.27e-52
+"frequency","frequency","GroupPWA",-0.166,-0.397,0.066,-1.419,0.117,0.159
+"frequency","frequency","fluency_score",-0.012,-0.019,-0.004,-3.237,0.004,0.00167
+"frequency","frequency","avg_length",-0.132,-0.188,-0.077,-4.718,0.028,8.18e-06
+"frequency","frequency","GroupPWA:fluency_score",0.012,-0.002,0.026,1.66,0.007,0.1
