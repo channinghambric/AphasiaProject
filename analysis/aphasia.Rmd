@@ -30,8 +30,8 @@ library(gt)
 
 ## Import Raw Data
 ```{r}
-control_fluency<-read.csv("../excel_data/Controls_Fluency.csv")
-pwa_fluency<-read.csv("../excel_data/PWA_Fluency.csv")
+#control_fluency<-read.csv("../excel_data/Controls_Fluency.csv")
+#pwa_fluency<-read.csv("../excel_data/PWA_Fluency.csv")
 pwa_dx<-read.csv("../excel_data/3_PWA_BatteryData_NoID.csv")
 ```
 
@@ -39,48 +39,48 @@ pwa_dx<-read.csv("../excel_data/3_PWA_BatteryData_NoID.csv")
 ## Data Cleaning & Organization
 ```{r}
 #reformat data
-control_fluency <- control_fluency %>% select(-X1) %>%
-  pivot_longer(cols = starts_with("X"),  
-               names_to = "Word",           
-               values_to = "Entry") %>% select(-Word) %>% filter(Entry != "") %>% rename(ID=Fluency.Code)
+#control_fluency <- control_fluency %>% select(-X1) %>%
+#  pivot_longer(cols = starts_with("X"),  
+#               names_to = "Word",           
+#               values_to = "Entry") %>% select(-Word) %>% filter(Entry != "") %>% rename(ID=Fluency.Code)
 
-pwa_fluency <- pwa_fluency %>% select(-X1) %>%
-  pivot_longer(cols = starts_with("X"),  
-               names_to = "Word",           
-               values_to = "Entry") %>%select(-Word) %>%filter(Entry != "") 
+#pwa_fluency <- pwa_fluency %>% select(-X1) %>%
+#  pivot_longer(cols = starts_with("X"),  
+#               names_to = "Word",           
+#               values_to = "Entry") %>%select(-Word) %>%filter(Entry != "") 
 
 #Link dx
-dx<-pwa_dx %>%select(Fluency.ID,LangDx,WABAQ) %>% rename(ID=Fluency.ID) %>% mutate(ID = as.character(ID))%>%distinct(ID, .keep_all = TRUE)
-pwa_fluency<-pwa_fluency %>%
-  left_join(dx,by="ID") %>%
-  mutate(LangDx = str_to_lower(LangDx)) %>%mutate_all(~str_replace_all(., "\\s+", ""))
+#dx<-pwa_dx %>%select(Fluency.ID,LangDx,WABAQ) %>% rename(ID=Fluency.ID) %>% mutate(ID = as.character(ID))%>%distinct(ID, .keep_all = TRUE)
+#pwa_fluency<-pwa_fluency %>%
+#  left_join(dx,by="ID") %>%
+#  mutate(LangDx = str_to_lower(LangDx)) %>%mutate_all(~str_replace_all(., "\\s+", ""))
 
 #Counting fluency
-control_fluency<- control_fluency %>%group_by(ID) %>% mutate(fluency_score=n()) %>%
-  ungroup()
+#control_fluency<- control_fluency %>%group_by(ID) %>% mutate(fluency_score=n()) %>%
+#  ungroup()
 
-pwa_fluency<-pwa_fluency %>%group_by(ID) %>% mutate(fluency_score=n()) %>%
-  ungroup()
+#pwa_fluency<-pwa_fluency %>%group_by(ID) %>% mutate(fluency_score=n()) %>%
+#  ungroup()
 
 #How many pwa have > 10 entries?
-pwa_fluency_cutoff<- pwa_fluency %>% filter(fluency_score>=10)
+#pwa_fluency_cutoff<- pwa_fluency %>% filter(fluency_score>=10)
 
 #List of ids to be dropped
-pwa_fluency_dropped_ids <- pwa_fluency %>%
-  filter(fluency_score < 10)
+#pwa_fluency_dropped_ids <- pwa_fluency %>%
+#  filter(fluency_score < 10)
 
-cutoff_id_count <- pwa_fluency_cutoff %>%
-  summarise(Unique_IDs = n_distinct(ID)) %>%
-  print()
+#cutoff_id_count <- pwa_fluency_cutoff %>%
+#  summarise(Unique_IDs = n_distinct(ID)) %>%
+#  print()
 
 #recoding rec broca's anomic to just anomic
-pwa_fluency_cutoff<-pwa_fluency_cutoff%>%
-  mutate(LangDx = ifelse(LangDx == "anomic(rec.broca's)", "anomic", LangDx))
+#pwa_fluency_cutoff<-pwa_fluency_cutoff%>%
+#  mutate(LangDx = ifelse(LangDx == "anomic(rec.broca's)", "anomic", LangDx))
 
 #dx distribution of retained ids
-pwa_fluency_dist<- pwa_fluency_cutoff %>% group_by(LangDx) %>%
-  summarise(Unique_Participants = n_distinct(ID))
-pwa_fluency_dist
+#pwa_fluency_dist<- pwa_fluency_cutoff %>% group_by(LangDx) %>%
+#  summarise(Unique_Participants = n_distinct(ID))
+#pwa_fluency_dist
 
 #Writing cutoff file to csv
 #write.csv(pwa_fluency_cutoff,"pwa_fluency_cleaned.csv")
@@ -826,7 +826,7 @@ lexical_battery_long<-lexical_battery_wide %>%
 
 #Clustering df
 clusters_battery<-best_clusters %>%filter(Group=="PWA") %>%left_join(battery_clean,by="Subject")
-write.csv(clusters_battery,"clustering_metrics_battery.csv") # save to csv
+#write.csv(clusters_battery,"clustering_metrics_battery.csv") # save to csv
 
 
 
@@ -839,17 +839,17 @@ fluency_battery_lm = lm(data = lexical_battery_wide, fluency_score ~ TCorrPNT+se
 summary(fluency_battery_lm)
 
 
-tbl_df <- broom::tidy(fluency_battery_lm, effects = "fixed", conf.int = TRUE) %>%
-transmute(
-    Term = term,
-    Estimate = round(estimate, 3),
-  `CI_low` = round(conf.low, 3),
-    `CI_high` = round(conf.high, 3),
-    t_value = round(statistic, 3),
-    SE = round(std.error, 3),
-    p_value = signif(p.value, 3)
- )
-write.csv(tbl_df, "fluency_battery_model_results.csv", row.names = FALSE)
+#tbl_df <- broom::tidy(fluency_battery_lm, effects = "fixed", conf.int = TRUE) %>%
+#transmute(
+#    Term = term,
+#    Estimate = round(estimate, 3),
+#  `CI_low` = round(conf.low, 3),
+#    `CI_high` = round(conf.high, 3),
+#    t_value = round(statistic, 3),
+#    SE = round(std.error, 3),
+#    p_value = signif(p.value, 3)
+# )
+#write.csv(tbl_df, "fluency_battery_model_results.csv", row.names = FALSE)
 
 #Do battery measures predict semantic similarity, phonological similarity, and word frequency
 # Run lm() for each cue and extract results
@@ -866,22 +866,22 @@ model_battery_summaries <- lexical_battery_results %>%
 View(model_battery_summaries)
 
 
-tbl_df <- lexical_battery_results %>%
-  mutate(tidy_model = map(model, ~ broom::tidy(.x, conf.int = TRUE))) %>%
-  unnest(tidy_model) %>%
-  transmute(
-    Cue = cue,
-   Term = term,
-    Estimate = round(estimate, 3),
-    CI_low = round(conf.low, 3),
-    CI_high = round(conf.high, 3),
-    t_value = round(statistic, 3),
-   SE = round(std.error, 3),
-    p_value = signif(p.value, 3)
-  )
+#tbl_df <- lexical_battery_results %>%
+#  mutate(tidy_model = map(model, ~ broom::tidy(.x, conf.int = TRUE))) %>%
+#  unnest(tidy_model) %>%
+#  transmute(
+#    Cue = cue,
+#   Term = term,
+#    Estimate = round(estimate, 3),
+#    CI_low = round(conf.low, 3),
+#    CI_high = round(conf.high, 3),
+#    t_value = round(statistic, 3),
+#   SE = round(std.error, 3),
+#    p_value = signif(p.value, 3)
+#  )
 
 # Write to CSV
-write.csv(tbl_df, "lexical_battery_model_results.csv", row.names = FALSE)
+#write.csv(tbl_df, "lexical_battery_model_results.csv", row.names = FALSE)
 
 #for verbal semantic processing/comprehension tasks (syntot), high performance assc with lower inter-item phonological similarity in SFT  (less interference/more control over semantic processing)
 #for NON verbal semantic association/processing tasks (camcac), high score assc with high avg inter-item phonological similarity in SFT
@@ -994,51 +994,51 @@ summary(switch_battery_lm)
 
 ```{r}
 #import demographics
-dx<-dx%>%rename(Subject=ID)
-demos<-read.csv("../excel_data/demographics.csv") %>%rename("Subject"="Fluency.ID")%>%filter(Subject %in% all_lexical$Subject)%>%left_join(dx)
+#dx<-dx%>%rename(Subject=ID)
+#demos<-read.csv("../excel_data/demographics.csv") %>%rename("Subject"="Fluency.ID")%>%filter(Subject %in% all_lexical$Subject)%>%left_join(dx)
 
 # subtypes
-type_summary <- demos %>% filter(Group=="PWA")%>%group_by(Group)%>%
-  count(LangDx) %>%
-  mutate(prop = n / sum(n))
-type_summary
+#type_summary <- demos %>% filter(Group=="PWA")%>%group_by(Group)%>%
+#  count(LangDx) %>%
+#  mutate(prop = n / sum(n))
+#type_summary
 
 # gender
-gender_summary <- demos %>% group_by(Group)%>%
-  count(Gender) %>%
-  mutate(prop = n / sum(n))
-gender_summary
+#gender_summary <- demos %>% group_by(Group)%>%
+#  count(Gender) %>%
+#  mutate(prop = n / sum(n))
+#gender_summary
 
 # age
-avg_age <- demos %>%group_by(Group)%>%
-  summarise(
-    mean_age = mean(Age, na.rm = TRUE),
-    sd_age   = sd(Age, na.rm = TRUE),
-    min_age  = min(Age, na.rm = TRUE),
-    max_age  = max(Age, na.rm = TRUE))
-avg_age
+#avg_age <- demos %>%group_by(Group)%>%
+#  summarise(
+#    mean_age = mean(Age, na.rm = TRUE),
+#    sd_age   = sd(Age, na.rm = TRUE),
+#    min_age  = min(Age, na.rm = TRUE),
+#    max_age  = max(Age, na.rm = TRUE))
+#avg_age
 
 # education
-edu_summary <- demos %>%group_by(Group)%>%
-  count(Education) %>%
-  mutate(prop = n / sum(n))
-edu_summary
+#edu_summary <- demos %>%group_by(Group)%>%
+#  count(Education) %>%
+#  mutate(prop = n / sum(n))
+#edu_summary
 
 # race
-race_summary <- demos %>%group_by(Group)%>%
-  count(EthnicGrp) %>%
-  mutate(prop = n / sum(n))
-race_summary
+#race_summary <- demos %>%group_by(Group)%>%
+#  count(EthnicGrp) %>%
+#  mutate(prop = n / sum(n))
+#race_summary
 
 
 # for table
-battery_wide<-battery_long%>%
-    pivot_wider(
-    id_cols = Subject,
-    names_from = test,
-    values_from = value)
-table_df<-battery_wide%>%left_join(demos)%>%unique()
-write.csv(table_df,"table_info.csv")
+#battery_wide<-battery_long%>%
+#    pivot_wider(
+#    id_cols = Subject,
+#    names_from = test,
+#    values_from = value)
+#table_df<-battery_wide%>%left_join(demos)%>%unique()
+#write.csv(table_df,"table_info.csv")
 ```
 
 
