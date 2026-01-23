@@ -36,7 +36,7 @@ pwa_dx<-read.csv("../excel_data/3_PWA_BatteryData_NoID.csv")
 ```
 
 
-## Data Cleaning
+## Data Cleaning & Organization
 ```{r}
 #reformat data
 control_fluency <- control_fluency %>% select(-X1) %>%
@@ -177,7 +177,7 @@ tbl_df <- broom::tidy(fluency_lm, effects = "fixed", conf.int = TRUE) %>%
     SE = round(std.error, 3),
     p_value = signif(p.value, 3)
   )
-write.csv(tbl_df, "fluency_model_results.csv", row.names = FALSE)
+#write.csv(tbl_df, "fluency_model_results.csv", row.names = FALSE)
 
 #Does semantic similarity, phonological similarity, and frequency differ across Groups
 # Run lm() for each cue and extract results
@@ -208,14 +208,14 @@ tbl_df <- lexical_results %>%
   )
 
 # Write to CSV
-write.csv(tbl_df, "lexical_model_results.csv", row.names = FALSE)
+#write.csv(tbl_df, "lexical_model_results.csv", row.names = FALSE)
 
 ```
 
 ## Lexical Plots
 ```{r}
 
-#fluency density plot
+#fluency plot
 fluency_plot <- lexical_analysis_data_fluency %>%
   ggplot(aes(x = Group, 
              y = fluency_score, 
@@ -345,7 +345,6 @@ lowest_bic = bic %>%
   group_by(Subject) %>%
   slice_min(optimalBIC)
 
-#look at mean vs median bic across everyone, what is the spread - which model is lowest
 
 # Looking at distribution
 # optimal BIC
@@ -365,7 +364,7 @@ lowest_bic %>%
 
 #######################################
 
-#BY GROUP BEST MODELS
+#BY GROUP BEST MODELS - USE
 
 #median delta BIC
 median_delta_bic = bic %>%
@@ -376,6 +375,19 @@ median_delta_bic = bic %>%
   slice(1) %>% 
   ungroup() 
 kable(median_delta_bic)
+
+
+# Exploratory - collapsing across groups
+#median_delta_bic_all = bic %>%
+# mutate(deltaBIC  = randomBIC - optimalBIC) %>%
+#  group_by(everything) %>%
+# summarise(median_delta_BIC = median(deltaBIC)) %>%
+#  arrange(desc(median_delta_BIC)) %>%
+#  slice(1) %>% 
+#  ungroup() 
+#kable(median_delta_bic_all)
+
+
 
 
 
@@ -406,26 +418,71 @@ beta_results <- beta_values  %>%
   )
 
 
-tbl_df <- beta_results %>%
-  mutate(tidy_model = map(model, ~ broom::tidy(.x, conf.int = TRUE))) %>%
-  unnest(tidy_model) %>%
-transmute(
-  Term = term,
-    Estimate = round(estimate, 3),
-    CI_low = round(conf.low, 3),
-    CI_high = round(conf.high, 3),
-   t_value = round(statistic, 3),
-    SE = round(std.error, 3),
-    p_value = signif(p.value, 3)
-  )
+#tbl_df <- beta_results %>%
+#  mutate(tidy_model = map(model, ~ broom::tidy(.x, conf.int = TRUE))) %>%
+#  unnest(tidy_model) %>%
+#transmute(
+#  Term = term,
+#    Estimate = round(estimate, 3),
+#    CI_low = round(conf.low, 3),
+#    CI_high = round(conf.high, 3),
+#   t_value = round(statistic, 3),
+#    SE = round(std.error, 3),
+#    p_value = signif(p.value, 3)
+#  )
 # Write to CSV
-write.csv(tbl_df, "beta_model_results.csv", row.names = FALSE)
+#write.csv(tbl_df, "beta_model_results.csv", row.names = FALSE)
 
 #View results
 beta_summaries <- beta_results %>%
   mutate(model_summary = map(model, broom::tidy)) %>%
   unnest(model_summary)
 View(beta_summaries)
+
+
+
+##############################
+#EXPLORATORY
+#Filtering full data to only include best model for all (collapsing across groups)
+#best_models_all <- all_models %>%
+#  filter(paste(everything) %in% paste(median_delta_bic_all$everything)) 
+
+#Separating out betas
+#beta_values_all  = best_models_all  %>%
+ # pivot_longer(names_to = "beta", cols = c(Beta_Frequency, Beta_Phonological, Beta_Semantic))
+
+
+# Run lm() for each beta type and extract results
+#beta_results_all <- beta_values_all  %>%
+#  group_by(beta) %>%                                   
+#  nest() %>%                                         
+# mutate(
+#    model = map(data, ~ lm(value ~ Group, data = .)) 
+#  )
+
+
+#tbl_df <- beta_results %>%
+#  mutate(tidy_model = map(model, ~ broom::tidy(.x, conf.int = TRUE))) %>%
+#  unnest(tidy_model) %>%
+#transmute(
+#  Term = term,
+#    Estimate = round(estimate, 3),
+#    CI_low = round(conf.low, 3),
+#    CI_high = round(conf.high, 3),
+#   t_value = round(statistic, 3),
+#    SE = round(std.error, 3),
+#    p_value = signif(p.value, 3)
+#  )
+# Write to CSV
+#write.csv(tbl_df, "beta_model_results.csv", row.names = FALSE)
+
+#View results
+#beta_summaries_all <- beta_results_all %>%
+#  mutate(model_summary = map(model, broom::tidy)) %>%
+#  unnest(model_summary)
+#View(beta_summaries_all)
+
+#semantic and frequency findings the same, group ME for phonological similarity 
 
 
 ```
@@ -472,33 +529,33 @@ best_clusters <- all_indv%>%
 cluster_size_lm = lm(data = best_clusters, Cluster_Size_mean ~ Group + fluency_score)
 summary(cluster_size_lm)
 
-tbl_df <- broom::tidy(cluster_size_lm, effects = "fixed", conf.int = TRUE) %>%
-  transmute(
-    Term = term,
-    Estimate = round(estimate, 3),
-    `CI_low` = round(conf.low, 3),
-    `CI_high` = round(conf.high, 3),
-    t_value = round(statistic, 3),
-    SE = round(std.error, 3),
-    p_value = signif(p.value, 3)
-)
-write.csv(tbl_df, "cluster_model_results.csv", row.names = FALSE)
+#tbl_df <- broom::tidy(cluster_size_lm, effects = "fixed", conf.int = TRUE) %>%
+#  transmute(
+#    Term = term,
+#    Estimate = round(estimate, 3),
+#    `CI_low` = round(conf.low, 3),
+#    `CI_high` = round(conf.high, 3),
+#    t_value = round(statistic, 3),
+#    SE = round(std.error, 3),
+#    p_value = signif(p.value, 3)
+#)
+#write.csv(tbl_df, "cluster_model_results.csv", row.names = FALSE)
 
 #When using the best method for each Group, does avg numb switches differ by Group x domain
 switch_numb_lm = lm(data = best_clusters, Number_of_Switches ~Group + fluency_score)
 summary(switch_numb_lm)
 
-tbl_df <- broom::tidy(switch_numb_lm, effects = "fixed", conf.int = TRUE) %>%
-  transmute(
-   Term = term,
-    Estimate = round(estimate, 3),
-   `CI_low` = round(conf.low, 3),
-    `CI_high` = round(conf.high, 3),
-    t_value = round(statistic, 3),
-   SE = round(std.error, 3),
-    p_value = signif(p.value, 3)
- )
-write.csv(tbl_df, "switchnum_model_results.csv", row.names = FALSE)
+#tbl_df <- broom::tidy(switch_numb_lm, effects = "fixed", conf.int = TRUE) %>%
+#  transmute(
+#   Term = term,
+#    Estimate = round(estimate, 3),
+#   `CI_low` = round(conf.low, 3),
+#    `CI_high` = round(conf.high, 3),
+#    t_value = round(statistic, 3),
+#   SE = round(std.error, 3),
+#    p_value = signif(p.value, 3)
+# )
+#write.csv(tbl_df, "switchnum_model_results.csv", row.names = FALSE)
 
 #Replicating prev analyses where they don't include fluency score as covariate
 cluster_size_lm_no_fs = lm(data = best_clusters, Cluster_Size_mean ~ Group)
@@ -508,6 +565,37 @@ summary(cluster_size_lm_no_fs)
 #When using the best method for each Group, does avg numb switches differ by Group x domain
 switch_numb_lm_no_fs = lm(data = best_clusters, Number_of_Switches ~Group)
 summary(switch_numb_lm_no_fs)
+
+
+###########################
+#EXPLORATORY
+#looking at clustering using overall best method (collapsing across groups)
+#filtering to only include best method for all
+#best_clusters_all <- all_indv%>%
+#  filter(paste(full_method) %in% paste(best_models_all$full_method)) %>%select(-fluency_score)%>% #this is full of NAs & produces mismatch .x/.y error, so dropping
+#  group_by(Group) %>%left_join(lexical_analysis_data_fluency%>%select(Subject,Group,fluency_score)%>%unique(), by = c("Subject", "Group")) #adding fluency_score back in
+
+#When using the best method, does avg cluster mean differ by Group x domain
+#number of items produced as a covariate (intx does not sig add to model)
+#cluster_size_lm_all = lm(data = best_clusters_all, Cluster_Size_mean ~ Group + fluency_score)
+#summary(cluster_size_lm_all)
+#no diff from group level
+
+#When using the best method, does avg numb switches differ by Group x domain
+#switch_numb_lm_all = lm(data = best_clusters_all, Number_of_Switches ~Group + fluency_score)
+#summary(switch_numb_lm_all)
+#no diff from group level
+
+#Replicating prev analyses where they don't include fluency score as covariate
+#cluster_size_lm_no_fs_all = lm(data = best_clusters_all, Cluster_Size_mean ~ Group)
+#summary(cluster_size_lm_no_fs_all)
+#no diff from group level
+
+#When using the best method, does avg numb switches differ by Group x domain
+#switch_numb_lm_no_fs_all = lm(data = best_clusters_all, Number_of_Switches ~Group)
+#summary(switch_numb_lm_no_fs_all)
+#no diff from group level
+
 
 ####################
 
