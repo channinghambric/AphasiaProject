@@ -26,13 +26,14 @@ library(patchwork)
 library(data.table)
 library(dplyr)
 library(gt)
+library(glmnet)
 ```
 
 ## Import Raw Data
 ```{r}
 #control_fluency<-read.csv("../excel_data/Controls_Fluency.csv")
 #pwa_fluency<-read.csv("../excel_data/PWA_Fluency.csv")
-pwa_dx<-read.csv("../excel_data/3_PWA_BatteryData_NoID.csv")
+pwa_dx<-read.csv("Battery_Clean.csv")
 ```
 
 
@@ -50,7 +51,7 @@ pwa_dx<-read.csv("../excel_data/3_PWA_BatteryData_NoID.csv")
 #               values_to = "Entry") %>%select(-Word) %>%filter(Entry != "") 
 
 #Link dx
-#dx<-pwa_dx %>%select(Fluency.ID,LangDx,WABAQ) %>% rename(ID=Fluency.ID) %>% mutate(ID = as.character(ID))%>%distinct(ID, .keep_all = TRUE)
+dx<-pwa_dx %>%select(Subject,SubType,WABAQ) %>% rename(ID=Subject) %>% mutate(ID = as.character(ID))%>%distinct(ID, .keep_all = TRUE)
 #pwa_fluency<-pwa_fluency %>%
 #  left_join(dx,by="ID") %>%
 #  mutate(LangDx = str_to_lower(LangDx)) %>%mutate_all(~str_replace_all(., "\\s+", ""))
@@ -144,8 +145,8 @@ all_switches = rbind(control_switch_results,pwa_switch_results)%>% separate(Swit
 ```{r}
 #import words lengths
 #to get word lengths, cleaned fluency lists were run through word_length.py
-control_lengths<-read.csv("control_wordlength.csv") %>%rename("Subject"="ID") %>%mutate(Group="Control")
-pwa_lengths<-read.csv("pwa_wordlength.csv")%>%rename("Subject"="ID")%>%mutate(Group="PWA")%>%mutate(Subject=as.factor(Subject))
+control_lengths<-read.csv("control_wordlength.csv") %>%mutate(Group="Control")
+pwa_lengths<-read.csv("pwa_wordlength.csv")%>%mutate(Group="PWA")%>%mutate(Subject=as.factor(Subject))
 comb_wordlength <- rbind(control_lengths, pwa_lengths) %>%
   group_by(Subject, Group) %>%
   summarize(avg_length = mean(Phoneme.Count, na.rm = TRUE))
@@ -750,25 +751,35 @@ ggplot(data=switches_recoded%>%filter(cue=="frequency"),aes(x = Group, y = value
 #Pre-recorded nonword targets derived from PNT,  target words were presented to participants for repetition. 
 #Performance is measured by percent correct of 60 trials: M=47.3, SD=25.8, Range=0–98.
 
+
+#na counts
+na_table <- tibble(
+  column = names(pwa_dx),
+  n_NA = sapply(pwa_dx, function(x) sum(is.na(x)))
+) %>%
+  filter(n_NA > 0) %>%
+  arrange(desc(n_NA))
+
+na_table
+
 #set up dfs
 battery_long <- pwa_dx %>%
-  group_by(Fluency.ID) %>%
+  group_by(Subject) %>%
   slice_head(n = 1) %>%
   ungroup() %>%
-  rename(Subject = Fluency.ID) %>%
   filter(Subject %in% all_indv$Subject) %>%
-  select(Subject, TCorrPNT, TrueSem, TrueFor, TrueMix, TrueNonW, prt, syntot., camcac., nonwdrep..) %>%
+  select(Subject, PNT_Total_Correct, Semantic_Errors_PNT, Formal_Errors_PNT, Mixed_Errors_PNT, Nonword_Errors_PNT,Nonword_Repetition_Test, PRT, Synonymy_Triplet_Test, Camels_and_Cactus_Test,Immediate_Serial_Recall_Wordspan,Category_Probe,Maximum_Category_Probe,Rhyme_Probe,Maximum_Rhyme_Probe) %>%
   mutate(
     Subject = as.factor(Subject),
     across(-Subject, ~ suppressWarnings(as.numeric(as.character(.))))
   ) %>%
   mutate(
-    semantic_output = rowSums(across(c(TrueSem, TrueMix)), na.rm = TRUE),
-    phon_output     = rowSums(across(c(TrueNonW, TrueFor)), na.rm = TRUE)
+    semantic_output = rowSums(across(c(Semantic_Errors_PNT, Mixed_Errors_PNT)), na.rm = TRUE),
+    phon_output     = rowSums(across(c(Nonword_Errors_PNT, Formal_Errors_PNT)), na.rm = TRUE)
   ) %>%
-  select(-TrueSem, -TrueMix, -TrueFor) %>%
+  select(-Semantic_Errors_PNT, -Mixed_Errors_PNT, -Formal_Errors_PNT) %>%
   pivot_longer( # put in long format for outlier drops
-    cols = c(TCorrPNT, TrueNonW, semantic_output, phon_output, prt, syntot., camcac., nonwdrep..),
+    cols = c(PNT_Total_Correct, semantic_output,phon_output, Nonword_Repetition_Test, PRT, Synonymy_Triplet_Test, Camels_and_Cactus_Test,Immediate_Serial_Recall_Wordspan,Category_Probe,Maximum_Category_Probe,Rhyme_Probe,Maximum_Rhyme_Probe),
     names_to = "test",
     values_to = "value"
   ) %>%
@@ -792,12 +803,10 @@ battery_clean<- battery_long %>%
 
 
 # check dropped values by test
-battery_outliers <- battery_long %>%
-  filter(is_outlier)
-battery_outliers %>%
-  arrange(test, value) %>%
-  select(Subject, test, value, L, U, med, MAD)
-
+battery_long %>%
+  filter(is_outlier) %>%
+  count(test, name = "n_outliers") %>%
+  arrange(desc(n_outliers))
 
 #LOOKING AT CORRELATIONS
 library(corrplot)
@@ -835,9 +844,11 @@ clusters_battery<-best_clusters %>%filter(Group=="PWA") %>%left_join(battery_cle
 ## Lexical Analyses
 ```{r}
 #do battery measures predict fluency
-fluency_battery_lm = lm(data = lexical_battery_wide, fluency_score ~ TCorrPNT+semantic_output+phon_output+prt+syntot.+camcac.+nonwdrep..+avg_length)
+fluency_battery_lm = lm(data = lexical_battery_wide, fluency_score ~ PNT_Total_Correct+semantic_output+phon_output+PRT+Synonymy_Triplet_Test+Camels_and_Cactus_Test+Nonword_Repetition_Test+avg_length+Immediate_Serial_Recall_Wordspan+Category_Probe+Maximum_Category_Probe+Rhyme_Probe+Maximum_Rhyme_Probe)
 summary(fluency_battery_lm)
 
+#PNT performance, nonword repetition, wordspan, and rhyme probe all predict fluency (wordspan effect negative)
+#if STM/WM is more intact, related competitors may be more coactive & cause interference during SFT?
 
 #tbl_df <- broom::tidy(fluency_battery_lm, effects = "fixed", conf.int = TRUE) %>%
 #transmute(
@@ -857,7 +868,7 @@ lexical_battery_results <- lexical_battery_long  %>%
   group_by(cue) %>%                                   # Group by cue
   nest() %>%                                         # Nest data by cue
  mutate(
-    model = map(data, ~ lm(value ~ TCorrPNT+semantic_output+phon_output+prt+syntot.+camcac.+nonwdrep..+avg_length+fluency_score, data = .)) # Fit models
+    model = map(data, ~ lm(value ~ PNT_Total_Correct+semantic_output+phon_output+PRT+Synonymy_Triplet_Test+Camels_and_Cactus_Test+Nonword_Repetition_Test+avg_length+Immediate_Serial_Recall_Wordspan+Category_Probe+Maximum_Category_Probe+Rhyme_Probe+Maximum_Rhyme_Probe+fluency_score, data = .)) # Fit models
   )
 #View results
 model_battery_summaries <- lexical_battery_results %>%
@@ -865,6 +876,8 @@ model_battery_summaries <- lexical_battery_results %>%
   unnest(model_summary)
 View(model_battery_summaries)
 
+#catspan - the smaller the semantic working memory span, the higher the average frequency in SFT
+#higher word span asc w/ greater avg word frequency
 
 #tbl_df <- lexical_battery_results %>%
 #  mutate(tidy_model = map(model, ~ broom::tidy(.x, conf.int = TRUE))) %>%
@@ -888,30 +901,887 @@ View(model_battery_summaries)
 
 ```
 
-## Battery x Fluency Plots
-```{r}
-emm_results <- list(
-  TCorrPNT = emmeans(fluency_battery_lm, ~ TCorrPNT, cov.reduce = range),
-  semantic_output  = emmeans(fluency_battery_lm, ~ semantic_output, cov.reduce = range),
-  phon_output  = emmeans(fluency_battery_lm, ~ phon_output, cov.reduce = range),
-  prt      = emmeans(fluency_battery_lm, ~ prt, cov.reduce = range),
-  syntot.  = emmeans(fluency_battery_lm, ~ syntot., cov.reduce = range),
-  camcac.  = emmeans(fluency_battery_lm, ~ camcac., cov.reduce = range),
-  nonwdrep..  = emmeans(fluency_battery_lm, ~ nonwdrep.., cov.reduce = range)
+## FLUENCY LASSO
 
+```{r}
+# ============================================================
+# ============================================================
+# 1) RELAXED LASSO (complete cases)
+
+run_relaxed_lasso_fluency <- function(df, outcome = "fluency_score", preds) {
+
+  # Keep only outcome + predictors, drop rows with any NA (glmnet can't handle NA)
+  d <- df %>%
+    select(all_of(c(outcome, preds))) %>%
+    na.omit()
+
+  if (nrow(d) < 15) return(NULL)
+
+  # Build glmnet x/y
+  x <- model.matrix(reformulate(preds, response = outcome), data = d)[, -1]
+  y <- d[[outcome]]
+
+  # CV relaxed LASSO
+  set.seed(123)
+  cv <- cv.glmnet(
+    x, y,
+    alpha = 1,
+    relax = TRUE,
+    standardize = TRUE,
+    nfolds = 10
+  )
+
+  # Helper to extract non-zero coefficient names
+  get_selected <- function(s) {
+    b <- coef(cv, s = s, mode = "relax")
+    setdiff(rownames(b)[as.numeric(b) != 0], "(Intercept)")
+  }
+
+  list(
+    n_complete   = nrow(d),
+    lambda_1se   = cv$lambda.1se,
+    lambda_min   = cv$lambda.min,
+    selected_1se = get_selected("lambda.1se"),
+    selected_min = get_selected("lambda.min")
+  )
+}
+preds <- c(
+  "PNT_Total_Correct","semantic_output","phon_output","PRT",
+  "Synonymy_Triplet_Test","Camels_and_Cactus_Test","Nonword_Repetition_Test",
+  "avg_length","Immediate_Serial_Recall_Wordspan",
+  "Category_Probe","Maximum_Category_Probe",
+  "Rhyme_Probe","Maximum_Rhyme_Probe"
+)
+fluency_relaxed <- run_relaxed_lasso_fluency(
+  df = lexical_battery_wide,
+  outcome = "fluency_score",
+  preds = preds
 )
 
+fluency_relaxed
 
-#plot sig predictors
+cat("\nComplete rows used:", fluency_relaxed$n_complete, "\n")
+cat("\nlambda.1se:", fluency_relaxed$lambda_1se, "\n")
+cat("lambda.min:", fluency_relaxed$lambda_min, "\n")
 
-#Phon Errors (PNT)
-plot_phon <- emmip(emm_results$phon_output, ~ phon_output, CIs = TRUE) +
-  labs(title = "",
-       x = "Phon Output Errors in PNT", 
-       y = "Estimated Fluency Score")  +
+cat("\n--- Selected @ lambda.1se ---\n")
+print(fluency_relaxed$selected_1se)
+
+cat("\n--- Selected @ lambda.min ---\n")
+print(fluency_relaxed$selected_min)
+
+
+refit_ols <- function(df, outcome, selected_vars) {
+  if (length(selected_vars) == 0) return(NULL)
+  d <- df %>% select(all_of(c(outcome, selected_vars))) %>% na.omit()
+  fit <- lm(reformulate(selected_vars, response = outcome), data = d)
+  summary(fit)
+}
+
+summary_1se <- refit_ols(lexical_battery_wide, "fluency_score", fluency_relaxed$selected_1se)
+summary_min <- refit_ols(lexical_battery_wide, "fluency_score", fluency_relaxed$selected_min)
+
+summary_1se
+summary_min
+
+#MI LASSO
+
+# -------------------------
+# 1) Choose predictors
+# -------------------------
+vars <- c(
+  "fluency_score",
+  "PNT_Total_Correct","semantic_output","phon_output","PRT",
+  "Synonymy_Triplet_Test","Camels_and_Cactus_Test","Nonword_Repetition_Test",
+  "avg_length","Immediate_Serial_Recall_Wordspan",
+  "Category_Probe","Maximum_Category_Probe",
+  "Rhyme_Probe","Maximum_Rhyme_Probe"
+)
+
+# -------------------------
+# 2) Prep data for glmnet
+#    - glmnet cannot handle NAs, so drop incomplete rows
+#    - glmnet needs:
+#        x = numeric matrix of predictors
+#        y = numeric outcome vector
+# -------------------------
+df <- lexical_battery_wide[, vars] %>% na.omit()
+cat("Rows after na.omit():", nrow(df), "\n")
+
+# model.matrix() creates the predictor matrix the same way lm() would
+# remove the intercept column because glmnet adds it internally
+x <- model.matrix(fluency_score ~ ., data = df)[, -1]
+y <- df$fluency_score
+
+
+##Multiple Imputation LASSO to handle missing data
+library(mice)
+imp <- mice(lexical_battery_wide[, vars], m = 20, seed = 123)
+
+lasso_selected <- lapply(1:20, function(i) {
+  d <- complete(imp, i)
+  x <- model.matrix(fluency_score ~ ., data = d)[, -1]
+  y <- d$fluency_score
+  cv <- cv.glmnet(x, y, alpha = 1)
+  rownames(coef(cv, s = "lambda.min"))[
+    coef(cv, s = "lambda.min")[,1] != 0
+  ]
+})
+
+table(unlist(lasso_selected))
+
+####
+
+## PCA
+library(psych)
+
+X <- df[, setdiff(names(df), "fluency_score")]
+
+# check suitability
+KMO(X)
+cortest.bartlett(cor(X), n = nrow(X))
+
+# exploratory factor analysis
+fa_fit <- fa(X, nfactors = 3, rotate = "oblimin", fm = "ml")
+print(fa_fit$loadings, cutoff = .3)
+
+# factor scores
+scores <- factor.scores(X, fa_fit)$scores
+scores_df <- as.data.frame(scores)
+scores_df$fluency_score <- df$fluency_score
+
+pca_fluency<-lm(fluency_score ~ ., data = scores_df)
+summary(pca_fluency)
+
+
+# ============================================================
+# Train/Test MI-LASSO
+# 1) Multiple Imputation (MICE)
+# 2) Train/Validation split
+# 3) LASSO (10-fold CV) on training set for variable selection
+# 4) Refit classical regression on selected vars
+# 5) Keep vars with p < .05
+# 6) VIF screening (VIF < 3)
+# 7) Final regression on training set
+# 8) Evaluate performance on validation set
+
+# ============================================================
+
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(glmnet)
+  library(mice)
+  library(caret)
+  library(car)
+})
+
+# -------------------------
+# 0) Specify variables
+# -------------------------
+vars <- c(
+  "fluency_score",
+  "PNT_Total_Correct","semantic_output","phon_output","PRT",
+  "Synonymy_Triplet_Test","Camels_and_Cactus_Test",
+  "Nonword_Repetition_Test","avg_length"
+)
+
+# -------------------------
+# 1) Multiple imputation (MICE)
+# -------------------------
+imp <- mice(
+  lexical_battery_wide[, vars],
+  m = 20,
+  seed = 123,
+  print = FALSE
+)
+
+# Many papers proceed by analyzing one completed dataset.
+# If you want to loop over all imputations, see optional section at bottom.
+data_imp <- complete(imp, 1)
+
+# -------------------------
+# 2) Train / validation split
+# -------------------------
+set.seed(123)
+train_idx <- createDataPartition(data_imp$fluency_score, p = 0.70, list = FALSE)
+train <- data_imp[train_idx, ]
+valid <- data_imp[-train_idx, ]
+
+# -------------------------
+# 3) LASSO on training set (10-fold CV)
+# -------------------------
+x_train <- model.matrix(fluency_score ~ ., data = train)[, -1]  # drop intercept
+y_train <- train$fluency_score
+
+set.seed(123)
+cv_lasso <- cv.glmnet(
+  x_train, y_train,
+  alpha = 1,      # LASSO
+  nfolds = 10,
+  standardize = TRUE
+)
+
+# Choose lambda: "lambda.min" matches your MI-LASSO earlier; lambda.1se is more conservative
+lambda_choice <- "lambda.min"
+
+# Extract selected predictors (non-zero coefficients)
+b <- coef(cv_lasso, s = lambda_choice)
+selected_vars <- rownames(b)[as.numeric(b) != 0]
+selected_vars <- setdiff(selected_vars, "(Intercept)")
+
+cat("\n==============================\n")
+cat("LASSO-selected predictors @", lambda_choice, "\n")
+cat("==============================\n")
+print(selected_vars)
+
+if (length(selected_vars) == 0) {
+  stop("LASSO selected no predictors at the chosen lambda. Try lambda.1se or check data.")
+}
+
+# -------------------------
+# 4) Refit classical OLS on selected predictors (training set)
+# -------------------------
+f_selected <- as.formula(paste("fluency_score ~", paste(selected_vars, collapse = " + ")))
+lm_selected <- lm(f_selected, data = train)
+
+cat("\n==============================\n")
+cat("OLS refit on LASSO-selected predictors (TRAIN)\n")
+cat("==============================\n")
+print(summary(lm_selected))
+
+# -------------------------
+# 5) Keep predictors with p < .05 (as in the example paper)
+# -------------------------
+pvals <- summary(lm_selected)$coefficients[, "Pr(>|t|)"]
+sig_vars <- names(pvals)[pvals < 0.05]
+sig_vars <- setdiff(sig_vars, "(Intercept)")
+
+cat("\n==============================\n")
+cat("Predictors with p < .05 after OLS refit\n")
+cat("==============================\n")
+print(sig_vars)
+
+if (length(sig_vars) == 0) {
+  cat("\nNo predictors meet p < .05 after refit. Stopping before VIF step.\n")
+  # You can still evaluate the lm_selected model if you want:
+  # goto evaluation section below
+}
+
+# -------------------------
+# 6) VIF screening (VIF < 3)
+#    Only possible if there are at least 2 predictors
+# -------------------------
+lm_sig <- NULL
+final_vars <- character(0)
+
+if (length(sig_vars) >= 2) {
+  f_sig <- as.formula(paste("fluency_score ~", paste(sig_vars, collapse = " + ")))
+  lm_sig <- lm(f_sig, data = train)
+
+  vif_vals <- car::vif(lm_sig)
+
+  cat("\n==============================\n")
+  cat("VIF values (TRAIN)\n")
+  cat("==============================\n")
+  print(vif_vals)
+
+  final_vars <- names(vif_vals)[vif_vals < 3]
+
+  cat("\n==============================\n")
+  cat("Final predictors after VIF < 3\n")
+  cat("==============================\n")
+  print(final_vars)
+
+} else if (length(sig_vars) == 1) {
+  cat("\nOnly 1 predictor passed p < .05, so VIF is not defined.\n")
+  cat("Keeping the single predictor:\n")
+  print(sig_vars)
+  final_vars <- sig_vars
+
+} else {
+  cat("\nNo predictors passed p < .05, skipping VIF.\n")
+  final_vars <- character(0)
+}
+
+# -------------------------
+# 7) Fit FINAL model (training set)
+# -------------------------
+lm_final <- NULL
+
+if (length(final_vars) > 0) {
+  f_final <- as.formula(paste("fluency_score ~", paste(final_vars, collapse = " + ")))
+  lm_final <- lm(f_final, data = train)
+
+  cat("\n==============================\n")
+  cat("FINAL OLS model (TRAIN)\n")
+  cat("==============================\n")
+  print(summary(lm_final))
+} else {
+  cat("\nNo final predictors after p-value and/or VIF filtering.\n")
+  cat("Consider using the LASSO-selected OLS refit (lm_selected) as your final model.\n")
+}
+
+# -------------------------
+# 8) Evaluate on VALIDATION set
+#    We'll evaluate whichever model exists:
+#      - lm_final if it exists
+#      - else lm_selected
+# -------------------------
+eval_model <- function(fit, newdata, outcome = "fluency_score") {
+  pred <- predict(fit, newdata = newdata)
+  y <- newdata[[outcome]]
+
+  rmse <- sqrt(mean((y - pred)^2))
+  r2 <- 1 - sum((y - pred)^2) / sum((y - mean(y))^2)
+
+  c(RMSE = rmse, R2 = r2)
+}
+
+cat("\n==============================\n")
+cat("VALIDATION PERFORMANCE\n")
+cat("==============================\n")
+
+if (!is.null(lm_final)) {
+  cat("\nUsing FINAL model:\n")
+  print(eval_model(lm_final, valid))
+} else {
+  cat("\nUsing LASSO-selected OLS refit model (since FINAL model was empty):\n")
+  print(eval_model(lm_selected, valid))
+}
+
+# ============================================================
+# OPTIONAL: If you want to repeat the entire pipeline across all
+# imputations and summarize stability of selection / performance,
+# tell me and I’ll give the pooled version (it’s longer).
+# ============================================================
+
+
+
+lm_fit <- lm(
+  fluency_score ~ PNT_Total_Correct + semantic_output + phon_output + PRT +
+    Synonymy_Triplet_Test + Camels_and_Cactus_Test + Nonword_Repetition_Test +
+    avg_length + Immediate_Serial_Recall_Wordspan +
+    Category_Probe + Maximum_Category_Probe +
+    Rhyme_Probe + Maximum_Rhyme_Probe,
+  data = lexical_battery_wide
+)
+
+vif_vals <- vif(lm_fit)
+vif_vals
+
+vif_table <- data.frame(
+  Predictor = names(vif_vals),
+  VIF = as.numeric(vif_vals),
+  row.names = NULL
+)
+
+print(vif_table)
+```
+
+# Lexical LASSO
+```{r}
+# LASSO
+preds <- c(
+  "PNT_Total_Correct","semantic_output","phon_output","PRT",
+  "Synonymy_Triplet_Test","Camels_and_Cactus_Test",
+  "Nonword_Repetition_Test","avg_length",
+  "Immediate_Serial_Recall_Wordspan",
+  "Category_Probe","Maximum_Category_Probe",
+  "Rhyme_Probe","Maximum_Rhyme_Probe"
+)
+
+# ============================================================
+# MULTIPLE-IMPUTATION LASSO
+# ============================================================
+run_mi_lasso <- function(df, m = 20) {
+
+  d <- df %>% select(value, all_of(preds))
+  if (nrow(d) < 15) return(NULL)
+
+  imp <- mice(d, m = m, seed = 123, print = FALSE)
+
+  selected <- map(1:m, function(i) {
+    di <- complete(imp, i)
+    x <- model.matrix(value ~ ., data = di)[, -1]
+    y <- di$value
+    cv <- cv.glmnet(x, y, alpha = 1)
+    setdiff(
+      rownames(coef(cv, s = "lambda.min"))[
+        coef(cv, s = "lambda.min")[,1] != 0
+      ],
+      "(Intercept)"
+    )
+  })
+
+  # frequency table of how often each predictor is selected
+  sort(table(unlist(selected)), decreasing = TRUE)
+}
+
+# ============================================================
+# 3) PCA / FACTOR REGRESSION
+#    - ML factor analysis with oblimin rotation
+#    - regress outcome on factor scores
+# ============================================================
+run_pca_regression <- function(df) {
+
+  d <- df %>%
+    select(value, all_of(preds)) %>%
+    na.omit()
+
+  # Guard against tiny samples
+  if (nrow(d) < 20) return(NULL)
+
+  X <- d[, preds]
+
+  # ------------------------------------------------------------
+  # 1) Parallel analysis to determine number of factors
+  #    plot = FALSE avoids graphics issues in pipelines
+  # ------------------------------------------------------------
+  pa <- fa.parallel(
+    X,
+    fm = "ml",
+    fa = "fa",
+    plot = FALSE
+  )
+
+  n_factors <- pa$nfact
+
+  # If parallel analysis fails or returns 0, stop safely
+  if (is.null(n_factors) || n_factors < 1) return(NULL)
+
+  # ------------------------------------------------------------
+  # 2) Fit factor analysis using data-supported number of factors
+  # ------------------------------------------------------------
+  fa_fit <- fa(
+    X,
+    nfactors = n_factors,
+    rotate = "oblimin",
+    fm = "ml"
+  )
+
+  # ------------------------------------------------------------
+  # 3) Compute factor scores and regress outcome on them
+  # ------------------------------------------------------------
+  scores <- factor.scores(X, fa_fit)$scores
+  scores_df <- as.data.frame(scores)
+  scores_df$value <- d$value
+
+  lm_fit <- lm(value ~ ., data = scores_df)
+
+  # ------------------------------------------------------------
+  # 4) Return everything needed for inspection / reporting
+  # ------------------------------------------------------------
+  list(
+    n_factors  = n_factors,
+    loadings   = fa_fit$loadings,
+    lm_summary = summary(lm_fit)
+  )
+}
+
+# ============================================================
+# 4) RUN ALL ANALYSES PER CUE
+# ============================================================
+lexical_battery_results <- lexical_battery_long %>%
+  group_by(cue) %>%
+  nest() %>%
+  mutate(
+    relaxed_lasso = map(data, run_relaxed_lasso),
+    mi_lasso      = map(data, run_mi_lasso),
+    pca_model     = map(data, run_pca_regression)
+  )
+
+# ============================================================
+# 5) EXAMPLES: HOW TO INSPECT RESULTS
+# ============================================================
+
+# MI-LASSO selection frequencies
+lexical_battery_results %>%
+  select(cue, mi_lasso) %>%
+  pwalk(function(cue, mi_lasso) {
+    cat("\n====================\n")
+    cat("Cue:", cue, "\n")
+    cat("====================\n")
+
+    if (is.null(mi_lasso)) {
+      cat("No MI-LASSO run (too few observations)\n")
+    } else {
+      print(mi_lasso)
+    }
+  })
+
+
+# PCA regression summary for first cue
+lexical_battery_results$pca_model[[2]]$lm_summary
+
+# PCA loadings for first cue
+lexical_battery_results$pca_model[[2]]$loadings
+
+
+
+
+
+# ============================================================
+# Cue-wise models (lexical_battery_long) using the SAME STYLE
+# as the fluency relaxed-LASSO workflow:
+#   - Outcome: value  (within each cue)
+#   - Predictors: fluency_score + battery measures
+#   - Runs PER CUE:
+#       1) Complete-case RELAXED LASSO (CV glmnet, relax=TRUE)
+#       2) Optional: MI-LASSO selection frequencies (MICE + cv.glmnet)
+#       3) Optional: OLS refit on selected predictors (interpretability)
+#   - Includes helpers to PRINT and to UNNEST results cleanly
+# ============================================================
+
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(purrr)
+  library(tidyr)
+  library(glmnet)
+  library(mice)
+  library(car)    # only if you want VIFs in OLS refits
+})
+
+# -------------------------
+# 0) Predictor set
+# -------------------------
+battery_preds <- c(
+  "PNT_Total_Correct","semantic_output","phon_output","PRT",
+  "Synonymy_Triplet_Test","Camels_and_Cactus_Test",
+  "Nonword_Repetition_Test","avg_length",
+  "Category_Probe","Maximum_Category_Probe",
+  "Rhyme_Probe","Maximum_Rhyme_Probe"
+)
+
+# Include fluency_score as a predictor of lexical-cue outcome "value"
+preds <- c("fluency_score", battery_preds)
+
+# ============================================================
+# 1) Complete-case RELAXED LASSO per cue
+# ============================================================
+run_relaxed_lasso_value <- function(df, outcome = "value", preds, min_n = 20) {
+
+  d <- df %>%
+    select(all_of(c(outcome, preds))) %>%
+    na.omit()
+
+  if (nrow(d) < min_n) return(NULL)
+
+  x <- model.matrix(reformulate(preds, response = outcome), data = d)[, -1]
+  y <- d[[outcome]]
+
+  set.seed(123)
+  cv <- cv.glmnet(
+    x, y,
+    alpha = 1,          # LASSO
+    relax = TRUE,       # relaxed refit
+    standardize = TRUE,
+    nfolds = 10
+  )
+
+  get_selected <- function(s) {
+    b <- coef(cv, s = s, mode = "relax")
+    setdiff(rownames(b)[as.numeric(b) != 0], "(Intercept)")
+  }
+
+  list(
+    n_complete   = nrow(d),
+    lambda_1se   = cv$lambda.1se,
+    lambda_min   = cv$lambda.min,
+    selected_1se = get_selected("lambda.1se"),
+    selected_min = get_selected("lambda.min")
+  )
+}
+
+# ============================================================
+# 2) Optional: MI-LASSO per cue (selection stability)
+#    - This is NOT relaxed LASSO; it's the common MI-LASSO approach:
+#        mice() -> cv.glmnet(alpha=1) each imputation -> selection freq
+# ============================================================
+run_mi_lasso_value <- function(df, outcome = "value", preds, m = 20, min_n = 20) {
+
+  d <- df %>% select(all_of(c(outcome, preds)))
+  if (nrow(d) < min_n) return(NULL)
+
+  # MICE can fail if a column is all-NA or constant in a cue; catch safely
+  imp <- try(
+    mice(d, m = m, seed = 123, print = FALSE),
+    silent = TRUE
+  )
+  if (inherits(imp, "try-error")) return(NULL)
+
+  selected <- map(1:m, function(i) {
+    di <- complete(imp, i)
+    x <- model.matrix(reformulate(preds, response = outcome), data = di)[, -1]
+    y <- di[[outcome]]
+    cv <- cv.glmnet(x, y, alpha = 1, standardize = TRUE, nfolds = 10)
+
+    b <- coef(cv, s = "lambda.min")
+    setdiff(rownames(b)[as.numeric(b) != 0], "(Intercept)")
+  })
+
+  # selection frequency table
+  sort(table(unlist(selected)), decreasing = TRUE)
+}
+
+# ============================================================
+# 3) Optional: OLS refit on selected predictors (interpretability)
+#    - Use ONLY as descriptive follow-up (post-selection p-values are not valid inference)
+# ============================================================
+refit_ols_value <- function(df, outcome = "value", selected_vars, min_n = 20) {
+  if (length(selected_vars) == 0) return(NULL)
+
+  d <- df %>%
+    select(all_of(c(outcome, selected_vars))) %>%
+    na.omit()
+
+  if (nrow(d) < min_n) return(NULL)
+
+  fit <- lm(reformulate(selected_vars, response = outcome), data = d)
+
+  list(
+    n_complete = nrow(d),
+    summary    = summary(fit),
+    vif        = if (length(selected_vars) >= 2) car::vif(fit) else NA
+  )
+}
+
+# ============================================================
+# 4) Run everything per cue
+# ============================================================
+lexical_cue_models <- lexical_battery_long %>%
+  group_by(cue) %>%
+  nest() %>%
+  mutate(
+    relaxed_lasso = map(data, ~ run_relaxed_lasso_value(.x, outcome = "value", preds = preds, min_n = 20)),
+    mi_lasso      = map(data, ~ run_mi_lasso_value(.x, outcome = "value", preds = preds, m = 20, min_n = 20)),
+    # OLS refit uses relaxed-lasso selections (lambda.min by default here)
+    ols_refit_min = map2(data, relaxed_lasso, ~ {
+      if (is.null(.y)) return(NULL)
+      refit_ols_value(.x, outcome = "value", selected_vars = .y$selected_min, min_n = 20)
+    })
+  )
+
+# ============================================================
+# 5) How to LOOK INSIDE the list columns (printing helpers)
+# ============================================================
+
+# ---- A) Print relaxed LASSO selections cue-by-cue ----
+lexical_cue_models %>%
+  select(cue, relaxed_lasso) %>%
+  pwalk(function(cue, relaxed_lasso) {
+    cat("\n====================\n")
+    cat("Cue:", cue, "\n")
+    cat("====================\n")
+
+    if (is.null(relaxed_lasso)) {
+      cat("Relaxed LASSO: NULL (too few complete rows)\n")
+      return()
+    }
+
+    cat("Complete rows used:", relaxed_lasso$n_complete, "\n")
+    cat("lambda.1se:", relaxed_lasso$lambda_1se, "\n")
+    cat("lambda.min:", relaxed_lasso$lambda_min, "\n")
+
+    cat("\nSelected @ lambda.1se:\n")
+    print(relaxed_lasso$selected_1se)
+
+    cat("\nSelected @ lambda.min:\n")
+    print(relaxed_lasso$selected_min)
+  })
+
+# ---- B) Print MI-LASSO frequency tables cue-by-cue ----
+lexical_cue_models %>%
+  select(cue, mi_lasso) %>%
+  pwalk(function(cue, mi_lasso) {
+    cat("\n====================\n")
+    cat("Cue:", cue, "\n")
+    cat("====================\n")
+
+    if (is.null(mi_lasso)) {
+      cat("MI-LASSO: NULL (imputation failed or too few rows)\n")
+    } else {
+      print(mi_lasso)
+    }
+  })
+
+# ---- C) Print OLS refit summaries (lambda.min-selected predictors) ----
+lexical_cue_models %>%
+  select(cue, ols_refit_min) %>%
+  pwalk(function(cue, ols_refit_min) {
+    cat("\n====================\n")
+    cat("Cue:", cue, "\n")
+    cat("====================\n")
+
+    if (is.null(ols_refit_min)) {
+      cat("OLS refit: NULL (no predictors selected or too few rows)\n")
+      return()
+    }
+
+    cat("Complete rows used:", ols_refit_min$n_complete, "\n\n")
+    print(ols_refit_min$summary)
+
+    cat("\nVIF (if >=2 predictors):\n")
+    print(ols_refit_min$vif)
+  })
+
+# ============================================================
+# 6) Make tidy tables (so you can View()/export)
+# ============================================================
+
+# ---- Relaxed LASSO selections as tidy tables ----
+relaxed_tidy <- lexical_cue_models %>%
+  transmute(
+    cue = cue,
+    n_complete = map_int(relaxed_lasso, function(z) {
+      if (is.null(z)) NA_integer_ else z$n_complete
+    }),
+    selected_1se = map(relaxed_lasso, function(z) {
+      if (is.null(z)) character(0) else z$selected_1se
+    }),
+    selected_min = map(relaxed_lasso, function(z) {
+      if (is.null(z)) character(0) else z$selected_min
+    })
+  )
+
+# Unnest into long format (tidyr >= 1.0 style)
+relaxed_1se_long <- relaxed_tidy %>%
+  select(cue, selected_1se) %>%
+  unnest(cols = selected_1se)
+
+relaxed_min_long <- relaxed_tidy %>%
+  select(cue, selected_min) %>%
+  unnest(cols = selected_min)
+
+
+# Unnest if you want a long table
+relaxed_1se_long <- relaxed_tidy %>% select(cue, selected_1se) %>% unnest(cols = c(selected_1se))
+relaxed_min_long <- relaxed_tidy %>% select(cue, selected_min) %>% unnest(cols = c(selected_min))
+
+# ---- MI-LASSO as tidy long table (cue, predictor, times_selected) ----
+mi_tidy <- lexical_cue_models %>%
+  select(cue, mi_lasso) %>%
+  filter(!map_lgl(mi_lasso, is.null)) %>%
+  mutate(mi_lasso = map(mi_lasso, as.data.frame)) %>%
+  unnest(cols = c(mi_lasso)) %>%
+  rename(predictor = Var1, times_selected = Freq) %>%
+  mutate(prop_selected = times_selected / 20)
+
+# Examples:
+# View(relaxed_tidy)
+# View(mi_tidy)
+# mi_tidy %>% arrange(cue, desc(times_selected))
+
+```
+
+
+
+## Battery x Fluency Plots 
+```{r}
+emm_results <- list(
+  PNT_Total_Correct = emmeans(
+    fluency_battery_lm, ~ PNT_Total_Correct, cov.reduce = range
+  ),
+  semantic_output = emmeans(
+    fluency_battery_lm, ~ semantic_output, cov.reduce = range
+  ),
+  phon_output = emmeans(
+    fluency_battery_lm, ~ phon_output, cov.reduce = range
+  ),
+  PRT = emmeans(
+    fluency_battery_lm, ~ PRT, cov.reduce = range
+  ),
+  Synonymy_Triplet_Test = emmeans(
+    fluency_battery_lm, ~ Synonymy_Triplet_Test, cov.reduce = range
+  ),
+  Camels_and_Cactus_Test = emmeans(
+    fluency_battery_lm, ~ Camels_and_Cactus_Test, cov.reduce = range
+  ),
+  Nonword_Repetition_Test = emmeans(
+    fluency_battery_lm, ~ Nonword_Repetition_Test, cov.reduce = range
+  ),
+  avg_length = emmeans(
+    fluency_battery_lm, ~ avg_length, cov.reduce = range
+  ),
+  Immediate_Serial_Recall_Wordspan = emmeans(
+    fluency_battery_lm, ~ Immediate_Serial_Recall_Wordspan, cov.reduce = range
+  ),
+  Category_Probe = emmeans(
+    fluency_battery_lm, ~ Category_Probe, cov.reduce = range
+  ),
+  Maximum_Category_Probe = emmeans(
+    fluency_battery_lm, ~ Maximum_Category_Probe, cov.reduce = range
+  ),
+  Rhyme_Probe = emmeans(
+    fluency_battery_lm, ~ Rhyme_Probe, cov.reduce = range
+  ),
+  Maximum_Rhyme_Probe = emmeans(
+    fluency_battery_lm, ~ Maximum_Rhyme_Probe, cov.reduce = range
+  )
+)
+
+# -------------------------
+# Plot significant predictors
+# -------------------------
+
+# Phonological output errors
+plot_phon <- emmip(
+  emm_results$Camels_and_Cactus_Test,
+  ~ Camels_and_Cactus_Test,
+  CIs = TRUE
+) +
+  labs(
+    title = "",
+    x = "Phon Output Errors",
+    y = "Estimated Fluency Score"
+  ) +
   theme_few() +
-  theme(aspect.ratio = 1.5, legend.position = "top")
+  theme(
+    aspect.ratio = 1.5,
+    legend.position = "top"
+  )
+
 plot_phon
+
+
+# Immediate serial recall word span
+span_fluency <- emmip(
+  emm_results$Immediate_Serial_Recall_Wordspan,
+  ~ Immediate_Serial_Recall_Wordspan,
+  CIs = TRUE
+) +
+  labs(
+    title = "",
+    x = "Immediate Serial Recall Word Span",
+    y = "Estimated Fluency Score"
+  ) +
+  theme_few() +
+  theme(
+    aspect.ratio = 1.5,
+    legend.position = "top"
+  )
+
+span_fluency
+
+
+# Rhyme probe
+rhyme_fluency <- emmip(
+  emm_results$Rhyme_Probe,
+  ~ Rhyme_Probe,
+  CIs = TRUE
+) +
+  labs(
+    title = "",
+    x = "Rhyme Span",
+    y = "Estimated Fluency Score"
+  ) +
+  theme_few() +
+  theme(
+    aspect.ratio = 1.5,
+    legend.position = "top"
+  )
+
+rhyme_fluency
+
 
 
 ```
@@ -926,68 +1796,79 @@ second_color <- koons_colors[2]
 
 # plot raw score scatter with model predicted line & CI
 overlay_emm_scatter <- function(model, df, pred, y_lab) {
-  # Get EMM predictions as df
-  emm <- emmeans(model, as.formula(paste("~", pred)), cov.reduce = range)
-  emm_df <- as.data.frame(emm) 
-  
+
+  # numeric covariates to fix at medians
+  num_vars <- names(Filter(is.numeric, model.frame(model)))
+  num_vars <- setdiff(num_vars, c(pred, "value"))  # don't override pred or outcome
+
+  at_list <- setNames(as.list(rep(NA_real_, length(num_vars))), num_vars)
+  for (v in num_vars) at_list[[v]] <- median(model.frame(model)[[v]], na.rm = TRUE)
+
+  emm <- emmeans(
+    model,
+    as.formula(paste("~", pred)),
+    cov.reduce = range,
+    at = at_list
+  )
+
+  emm_df <- as.data.frame(emm)
+
   ggplot() +
-    # Raw scatter 
     geom_point(
       data = df,
       aes(x = .data[[pred]], y = value),
-      size = 2, alpha = 0.7, color = second_color) +
-    # EMM CI ribbon
+      size = 2, alpha = 0.7, color = second_color
+    ) +
     geom_ribbon(
       data = emm_df,
       aes(x = .data[[pred]], ymin = lower.CL, ymax = upper.CL),
-      alpha = 0.2, fill = "cyan4") +
-    # EMM mean line
+      alpha = 0.2, fill = "cyan4"
+    ) +
     geom_line(
       data = emm_df,
       aes(x = .data[[pred]], y = emmean),
-      linewidth = 1, color = "cyan4") +
+      linewidth = 1, color = "cyan4"
+    ) +
     theme_few() +
-    theme(
-      legend.position = "none",
-      aspect.ratio = 1.5,
-      axis.text.x = element_text(hjust = 1, face = "bold")) +
-    labs(x = pred, y = y_lab)}
+    theme(legend.position = "none", aspect.ratio = 1.5,
+          axis.text.x = element_text(hjust = 1, face = "bold")) +
+    labs(x = pred, y = y_lab)
+}
 
-# Filter data/models 
-df_phon   <- lexical_battery_long %>% filter(cue == "phonological")
-res_phon  <- lexical_battery_results %>% filter(cue == "phonological")
+# Filter data/models
+df_phon  <- lexical_battery_long %>% filter(cue == "phonological")
+res_phon <- lexical_battery_results %>% filter(cue == "phonological")
 
-# get model results
+# get model (keeping your original indexing)
 mod <- lexical_battery_results$model[[2]]
 
-# overlay
-camel_overlay  <- overlay_emm_scatter(
+# overlay (UPDATED variable names)
+camel_overlay <- overlay_emm_scatter(
   model = mod,
   df    = df_phon,
-  pred  = "camcac.",
-  y_lab = "Estimated Phonological Similarity")
+  pred  = "Camels_and_Cactus_Test",
+  y_lab = "Estimated Phonological Similarity"
+)
 
 syntot_overlay <- overlay_emm_scatter(
   model = mod,
   df    = df_phon,
-  pred  = "syntot.", 
-  y_lab = "Estimated Phonological Similarity")
-
+  pred  = "Synonymy_Triplet_Test",
+  y_lab = "Estimated Phonological Similarity"
+)
 
 camel_overlay + syntot_overlay
-```
-## Cluster Analyses
-```{r}
-#When using the best method, does avg cluster size relate to battery measure performance
-cluster_battery_lm = lm(data = clusters_battery, Cluster_Size_mean ~ TCorrPNT+semantic_output+phon_output+prt+syntot.+camcac.)
-summary(cluster_battery_lm)
-#all ns
 
-switch_battery_lm = lm(data = clusters_battery, Number_of_Switches ~ TCorrPNT+semantic_output+phon_output+prt+syntot.+camcac.)
-summary(switch_battery_lm)
-#All ns
 
+
+ggplot(
+  data = lexical_battery_wide,
+  aes(x = Camels_and_Cactus_Test, y = phonological)
+) +
+  geom_point(size = 2, alpha = 0.7, color = second_color) +
+  geom_smooth(method = "lm", se = TRUE)
 ```
+
 
 ################################################
 #Demographics
@@ -995,7 +1876,7 @@ summary(switch_battery_lm)
 ```{r}
 #import demographics
 #dx<-dx%>%rename(Subject=ID)
-#demos<-read.csv("../excel_data/demographics.csv") %>%rename("Subject"="Fluency.ID")%>%filter(Subject %in% all_lexical$Subject)%>%left_join(dx)
+#demos<-read.csv("demographics_deid.csv")%>%filter(Subject %in% all_lexical$Subject)%>%left_join(dx)
 
 # subtypes
 #type_summary <- demos %>% filter(Group=="PWA")%>%group_by(Group)%>%
@@ -1006,12 +1887,12 @@ summary(switch_battery_lm)
 # gender
 #gender_summary <- demos %>% group_by(Group)%>%
 #  count(Gender) %>%
-#  mutate(prop = n / sum(n))
+# mutate(prop = n / sum(n))
 #gender_summary
 
 # age
 #avg_age <- demos %>%group_by(Group)%>%
-#  summarise(
+# summarise(
 #    mean_age = mean(Age, na.rm = TRUE),
 #    sd_age   = sd(Age, na.rm = TRUE),
 #    min_age  = min(Age, na.rm = TRUE),
@@ -1027,7 +1908,7 @@ summary(switch_battery_lm)
 # race
 #race_summary <- demos %>%group_by(Group)%>%
 #  count(EthnicGrp) %>%
-#  mutate(prop = n / sum(n))
+ # mutate(prop = n / sum(n))
 #race_summary
 
 
