@@ -768,7 +768,7 @@ battery_long <- pwa_dx %>%
   slice_head(n = 1) %>%
   ungroup() %>%
   filter(Subject %in% all_indv$Subject) %>%
-  select(Subject, PNT_Total_Correct, Semantic_Errors_PNT, Formal_Errors_PNT, Mixed_Errors_PNT, Nonword_Errors_PNT,Nonword_Repetition_Test, PRT, Synonymy_Triplet_Test, Camels_and_Cactus_Test,Immediate_Serial_Recall_Wordspan,Category_Probe,Maximum_Category_Probe,Rhyme_Probe,Maximum_Rhyme_Probe) %>%
+  select(Subject, PNT, Semantic_Errors_PNT, Formal_Errors_PNT, Mixed_Errors_PNT, Nonword_Errors_PNT,Nonword_Repetition_Test, PRT, Synonymy_Triplet_Test, Camels_and_Cactus_Test,Immediate_Serial_Recall_Wordspan,Category_Probe_Max_Span,Rhyme_Probe_Max_Span) %>%
   mutate(
     Subject = as.factor(Subject),
     across(-Subject, ~ suppressWarnings(as.numeric(as.character(.))))
@@ -779,7 +779,7 @@ battery_long <- pwa_dx %>%
   ) %>%
   select(-Semantic_Errors_PNT, -Mixed_Errors_PNT, -Formal_Errors_PNT) %>%
   pivot_longer( # put in long format for outlier drops
-    cols = c(PNT_Total_Correct, semantic_output,phon_output, Nonword_Repetition_Test, PRT, Synonymy_Triplet_Test, Camels_and_Cactus_Test,Immediate_Serial_Recall_Wordspan,Category_Probe,Maximum_Category_Probe,Rhyme_Probe,Maximum_Rhyme_Probe),
+    cols = c(PNT, semantic_output,phon_output, Nonword_Repetition_Test, PRT, Synonymy_Triplet_Test, Camels_and_Cactus_Test,Immediate_Serial_Recall_Wordspan,,Category_Probe_Max_Span,Rhyme_Probe_Max_Span),
     names_to = "test",
     values_to = "value"
   ) %>%
@@ -846,11 +846,10 @@ clusters_battery<-best_clusters %>%filter(Group=="PWA") %>%left_join(battery_cle
 ## First inspect VIF
 library(car)
 lm_fit <- lm(
-  fluency_score ~ PNT_Total_Correct + semantic_output + phon_output + PRT +
+  fluency_score ~ PNT+ semantic_output + phon_output + PRT +
     Synonymy_Triplet_Test + Camels_and_Cactus_Test + Nonword_Repetition_Test +
     avg_length + Immediate_Serial_Recall_Wordspan +
-    Category_Probe + Maximum_Category_Probe +
-    Rhyme_Probe + Maximum_Rhyme_Probe,
+    Category_Probe_Max_Span + Rhyme_Probe_Max_Span,
   data = lexical_battery_wide)
 
 vif_vals <- vif(lm_fit)
@@ -865,15 +864,15 @@ print(vif_table)
 
 
 #do battery measures predict fluency score
-fluency_battery_lm = lm(data = lexical_battery_wide, fluency_score ~ PNT_Total_Correct+semantic_output+phon_output+PRT+Synonymy_Triplet_Test+Camels_and_Cactus_Test+Nonword_Repetition_Test+avg_length)
+fluency_battery_lm = lm(data = lexical_battery_wide, fluency_score ~ PNT+semantic_output+phon_output+PRT+Synonymy_Triplet_Test+Camels_and_Cactus_Test+Nonword_Repetition_Test+avg_length)
 summary(fluency_battery_lm)
 
 #including max probe lengths
-fluency_battery_lm_add_probe = lm(data = lexical_battery_wide, fluency_score ~ PNT_Total_Correct+semantic_output+phon_output+PRT+Synonymy_Triplet_Test+Camels_and_Cactus_Test+Nonword_Repetition_Test+avg_length+Maximum_Category_Probe+Maximum_Rhyme_Probe)
+fluency_battery_lm_add_probe = lm(data = lexical_battery_wide, fluency_score ~ PNT+semantic_output+phon_output+PRT+Synonymy_Triplet_Test+Camels_and_Cactus_Test+Nonword_Repetition_Test+avg_length+Category_Probe_Max_Span + Rhyme_Probe_Max_Span)
 summary(fluency_battery_lm_add_probe)
 
 #just max probe lengths as preds
-fluency_battery_lm_just_probe = lm(data = lexical_battery_wide, fluency_score ~ Maximum_Category_Probe+Maximum_Rhyme_Probe)
+fluency_battery_lm_just_probe = lm(data = lexical_battery_wide, fluency_score ~ Category_Probe_Max_Span + Rhyme_Probe_Max_Span)
 summary(fluency_battery_lm_just_probe)
 
 
@@ -895,7 +894,7 @@ lexical_battery_results <- lexical_battery_long  %>%
   group_by(cue) %>%                                   # Group by cue
   nest() %>%                                         # Nest data by cue
  mutate(
-    model = map(data, ~ lm(value ~ PNT_Total_Correct+semantic_output+phon_output+PRT+Synonymy_Triplet_Test+Camels_and_Cactus_Test+Nonword_Repetition_Test+avg_length+fluency_score, data = .)) # Fit models
+    model = map(data, ~ lm(value ~ PNT+semantic_output+phon_output+PRT+Synonymy_Triplet_Test+Camels_and_Cactus_Test+Nonword_Repetition_Test+avg_length+fluency_score, data = .)) # Fit models
   )
 #View results
 model_battery_summaries <- lexical_battery_results %>%
@@ -927,7 +926,7 @@ lexical_battery_results_add_probe <- lexical_battery_long  %>%
   group_by(cue) %>%                                   # Group by cue
   nest() %>%                                         # Nest data by cue
  mutate(
-    model = map(data, ~ lm(value ~ PNT_Total_Correct+semantic_output+phon_output+PRT+Synonymy_Triplet_Test+Camels_and_Cactus_Test+Nonword_Repetition_Test+avg_length+Maximum_Category_Probe+Maximum_Rhyme_Probe+fluency_score, data = .)) # Fit models
+    model = map(data, ~ lm(value ~ PNT+semantic_output+phon_output+PRT+Synonymy_Triplet_Test+Camels_and_Cactus_Test+Nonword_Repetition_Test+avg_length+Category_Probe_Max_Span + Rhyme_Probe_Max_Span+fluency_score, data = .)) # Fit models
   )
 #View results
 model_battery_summaries_add_probe <- lexical_battery_results_add_probe %>%
@@ -941,7 +940,7 @@ lexical_battery_results_just_probe <- lexical_battery_long  %>%
   group_by(cue) %>%                                   # Group by cue
   nest() %>%                                         # Nest data by cue
  mutate(
-    model = map(data, ~ lm(value ~avg_length+Maximum_Category_Probe+Maximum_Rhyme_Probe+fluency_score, data = .)) # Fit models
+    model = map(data, ~ lm(value ~avg_length+Category_Probe_Max_Span + Rhyme_Probe_Max_Span+fluency_score, data = .)) # Fit models
   )
 #View results
 model_battery_summaries_just_probe <- lexical_battery_results_just_probe %>%
@@ -954,8 +953,8 @@ View(model_battery_summaries_just_probe)
 ## Battery x Fluency Plots 
 ```{r}
 emm_results <- list(
-  PNT_Total_Correct = emmeans(
-    fluency_battery_lm, ~ PNT_Total_Correct, cov.reduce = range
+  PNT = emmeans(
+    fluency_battery_lm, ~ PNT, cov.reduce = range
   ),
   semantic_output = emmeans(
     fluency_battery_lm, ~ semantic_output, cov.reduce = range
